@@ -107,6 +107,21 @@ void as::assembler::instr_st(int32_t reg, const operand_t& op) {
     emit_st(reg, op);
 }
 
+void as::assembler::emit_jump_and_literal(int32_t literal) {
+    emit_instruction(encode_instruction(0x3, 0x0, 0xF, 0x0, 0x0, 0x4));
+    emit_word(literal);
+}
+
+void as::assembler::emit_pool_ld(int32_t reg, int32_t literal) {
+    emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, 0xF, 0x0, 0x4));
+    emit_jump_and_literal(literal);
+}
+
+void as::assembler::emit_pool_st(int32_t reg, int32_t literal) {
+    emit_instruction(encode_instruction(0x8, 0x1, 0xF, 0x0, (uint8_t)reg, 0x4));
+    emit_jump_and_literal(literal);
+}
+
 void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
     if (reg == 0) {
         throw std::runtime_error("Unable to load value in r0");
@@ -117,7 +132,7 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                 emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0x0, 0x0, op.literal));
             }
             else {
-                // todo literal pool
+                emit_pool_ld(reg, op.literal);
             }
             break;
         }
@@ -127,11 +142,27 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                 if (it->second.absolute && check_bounds(it->second.value)) {
                     emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0x0, 0x0, (int16_t)it->second.value));
                 }
-                else if (it->second.defined && it->second.section == m_current_section && check_bounds(it->second.value - (current_offset() + 4))) {
-                    emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0xF, 0x0, (int16_t)(it->second.value - (current_offset() + 4))));
+                else if (it->second.absolute) {
+                    emit_pool_ld(reg, it->second.value);
+                }
+                else if (!it->second.defined) {
+                    emit_pool_ld(reg, 0);
+                    backpatch_t bp{};
+                    bp.section_name = m_current_section;
+                    bp.symbol_name = it->second.name;
+                    bp.type = backpatch_type::RELOC;
+                    bp.offset = current_offset() - 4;
+                    m_backpatch_table.push_back(bp);
                 }
                 else {
-                    // todo literal pool / reloc
+                    emit_pool_ld(reg, 0);
+                    relocation_t reloc{};
+                    reloc.section_name = m_current_section;
+                    reloc.symbol_name = op.symbol;
+                    reloc.type = reloaction_type::R_32;
+                    reloc.addend = 0;
+                    reloc.offset = current_offset() - 4;
+                    current_section().relocations.push_back(reloc);
                 }
             }
             else {
@@ -139,7 +170,13 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                 sym.name = op.symbol;
                 sym.section = SECTION_UNDEF;
                 m_sym_table.insert({op.symbol, sym});
-                // todo literal pool / reloc
+                emit_pool_ld(reg, 0);
+                backpatch_t bp{};
+                bp.symbol_name = op.symbol;
+                bp.section_name = m_current_section;
+                bp.offset = current_offset() - 4;
+                bp.type = backpatch_type::RELOC;
+                m_backpatch_table.push_back(bp);
             }
             break;
         }
@@ -148,7 +185,7 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                 emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, 0, 0, (int16_t)op.literal));
             }
             else {
-                // todo literal pool
+                emit_pool_ld(reg, op.literal);
             }
             break;
         }
@@ -158,11 +195,27 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                 if (it->second.absolute && check_bounds(it->second.value)) {
                     emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, 0x0, 0x0, (int16_t)it->second.value));
                 }
-                else if (it->second.defined && it->second.section == m_current_section && check_bounds(it->second.value - (current_offset() + 4))) {
-                    emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, 0xF, 0x0, (int16_t)(it->second.value - (current_offset() + 4))));
+                else if (it->second.absolute) {
+                    emit_pool_ld(reg, it->second.value);
+                }
+                else if (!it->second.defined) {
+                    emit_pool_ld(reg, 0);
+                    backpatch_t bp{};
+                    bp.section_name = m_current_section;
+                    bp.symbol_name = it->second.name;
+                    bp.type = backpatch_type::RELOC;
+                    bp.offset = current_offset() - 4;
+                    m_backpatch_table.push_back(bp);
                 }
                 else {
-                    // todo literal pool / reloc
+                    emit_pool_ld(reg, 0);
+                    relocation_t reloc{};
+                    reloc.section_name = m_current_section;
+                    reloc.symbol_name = op.symbol;
+                    reloc.type = reloaction_type::R_32;
+                    reloc.addend = 0;
+                    reloc.offset = current_offset() - 4;
+                    current_section().relocations.push_back(reloc);
                 }
             }
             else {
@@ -170,7 +223,13 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                 sym.name = op.symbol;
                 sym.section = SECTION_UNDEF;
                 m_sym_table.insert({op.symbol, sym});
-                // todo literal pool / reloc
+                emit_pool_ld(reg, 0);
+                backpatch_t bp{};
+                bp.symbol_name = op.symbol;
+                bp.section_name = m_current_section;
+                bp.offset = current_offset() - 4;
+                bp.type = backpatch_type::RELOC;
+                m_backpatch_table.push_back(bp);
             }
             break;
         }
@@ -207,17 +266,18 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                     sym.section = SECTION_UNDEF;
                     m_sym_table.insert({op.symbol, sym});
                 }
+                emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, op.reg, 0x0, 0x0));
                 backpatch_t bp{};
                 bp.section_name = m_current_section;
                 bp.symbol_name = op.symbol;
-                bp.offset = current_offset() + 2;
-                bp.needs_check = true;
+                bp.offset = current_offset() - 2;
+                bp.type = backpatch_type::BOUNDS;
                 m_backpatch_table.push_back(bp);
-                emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, op.reg, 0x0, 0x0));
             }
+            break;
         }
         default:
-            throw std::runtime_error("Invalid operand type for st instruction");
+            throw std::runtime_error("Invalid operand type for ld instruction");
     }
 }
 
@@ -228,7 +288,7 @@ void as::assembler::emit_st(int32_t reg, const operand_t& op) {
                 emit_instruction(encode_instruction(0x8, 0x0, 0x0, 0x0, (uint8_t)reg, op.literal));
             }
             else {
-                // todo literal pool
+                emit_pool_st(reg, op.literal);
             }
             break;
         }
@@ -238,11 +298,27 @@ void as::assembler::emit_st(int32_t reg, const operand_t& op) {
                 if (it->second.absolute && check_bounds(it->second.value)) {
                     emit_instruction(encode_instruction(0x8, 0x0, 0x0, 0x0, (uint8_t)reg, (int16_t)it->second.value));
                 }
-                else if (it->second.defined && it->second.section == m_current_section && check_bounds(it->second.value - (current_offset() + 4))) {
-                    emit_instruction(encode_instruction(0x8, 0x0, 0x0, 0xF, (uint8_t)reg, (int16_t)(it->second.value - (current_offset() + 4))));
+                else if (it->second.absolute) {
+                    emit_pool_st(reg, it->second.value);
+                }
+                else if (!it->second.defined) {
+                    emit_pool_st(reg, 0);
+                    backpatch_t bp{};
+                    bp.section_name = m_current_section;
+                    bp.symbol_name = it->second.name;
+                    bp.type = backpatch_type::RELOC;
+                    bp.offset = current_offset() - 4;
+                    m_backpatch_table.push_back(bp);
                 }
                 else {
-                    // todo literal pool / reloc
+                    emit_pool_st(reg, 0);
+                    relocation_t reloc{};
+                    reloc.section_name = m_current_section;
+                    reloc.symbol_name = op.symbol;
+                    reloc.type = reloaction_type::R_32;
+                    reloc.addend = 0;
+                    reloc.offset = current_offset() - 4;
+                    current_section().relocations.push_back(reloc);
                 }
             }
             else {
@@ -250,7 +326,13 @@ void as::assembler::emit_st(int32_t reg, const operand_t& op) {
                 sym.name = op.symbol;
                 sym.section = SECTION_UNDEF;
                 m_sym_table.insert({op.symbol, sym});
-                // todo literal pool / reloc
+                emit_pool_st(reg, 0);
+                backpatch_t bp{};
+                bp.symbol_name = op.symbol;
+                bp.section_name = m_current_section;
+                bp.offset = current_offset() - 4;
+                bp.type = backpatch_type::RELOC;
+                m_backpatch_table.push_back(bp);
             }
             break;
         }
@@ -283,13 +365,13 @@ void as::assembler::emit_st(int32_t reg, const operand_t& op) {
                     sym.section = SECTION_UNDEF;
                     m_sym_table.insert({op.symbol, sym});
                 }
+                emit_instruction(encode_instruction(0x8, 0x0, (uint8_t)op.reg, 0x0, (uint8_t)reg, 0x0));
                 backpatch_t bp{};
                 bp.section_name = m_current_section;
                 bp.symbol_name = op.symbol;
-                bp.offset = current_offset() + 2;
-                bp.needs_check = true;
+                bp.offset = current_offset() - 2;
+                bp.type = backpatch_type::BOUNDS;
                 m_backpatch_table.push_back(bp);
-                emit_instruction(encode_instruction(0x8, 0x0, (uint8_t)op.reg, 0x0, (uint8_t)reg, 0x0));
             }
             break;
         }
@@ -306,7 +388,8 @@ void as::assembler::emit_jump_or_call(uint8_t oc, uint8_t mod_direct, uint8_t mo
                 emit_instruction(encode_instruction(oc, mod_direct, 0x0, regB, regC, op.literal));
             }
             else {
-                // todo literal pool
+                emit_instruction(encode_instruction(oc, mod_mem, 0xF, regB, regC, 0x4));
+                emit_jump_and_literal(op.literal);
             }
             break;
         }
@@ -316,11 +399,30 @@ void as::assembler::emit_jump_or_call(uint8_t oc, uint8_t mod_direct, uint8_t mo
                 if (it->second.absolute && check_bounds(it->second.value)) {
                     emit_instruction(encode_instruction(oc, mod_direct, 0x0, regB, regC, it->second.value));
                 }
-                else if (it->second.defined && it->second.section == m_current_section && check_bounds(it->second.value - (current_offset() + 4))) {
-                    emit_instruction(encode_instruction(oc, mod_direct, 0xF, regB, regC, (int16_t)(it->second.value - (current_offset() + 4))));
+                else if (it->second.absolute) {
+                    emit_instruction(encode_instruction(oc, mod_mem, 0xF, regB, regC, 0x4));
+                    emit_jump_and_literal(it->second.value);
+                }
+                else if (!it->second.defined) {
+                    emit_instruction(encode_instruction(oc, mod_mem, 0xF, regB, regC, 0x4));
+                    emit_jump_and_literal(it->second.value);
+                    backpatch_t bp{};
+                    bp.section_name = m_current_section;
+                    bp.symbol_name = it->second.name;
+                    bp.type = backpatch_type::RELOC;
+                    bp.offset = current_offset() - 4;
+                    m_backpatch_table.push_back(bp);
                 }
                 else {
-                    // todo literal pool / reloc
+                    emit_instruction(encode_instruction(oc, mod_mem, 0xF, regB, regC, 0x4));
+                    emit_jump_and_literal(0);
+                    relocation_t reloc{};
+                    reloc.section_name = m_current_section;
+                    reloc.symbol_name = op.symbol;
+                    reloc.type = reloaction_type::R_32;
+                    reloc.addend = 0;
+                    reloc.offset = current_offset() - 4;
+                    current_section().relocations.push_back(reloc);
                 }
             }
             else {
@@ -328,11 +430,18 @@ void as::assembler::emit_jump_or_call(uint8_t oc, uint8_t mod_direct, uint8_t mo
                 sym.name = op.symbol;
                 sym.section = SECTION_UNDEF;
                 m_sym_table.insert({op.symbol, sym});
-                // todo literal pool / reloc
+                emit_instruction(encode_instruction(oc, mod_mem, 0xF, regB, regC, 0x4));
+                emit_jump_and_literal(0);
+                backpatch_t bp{};
+                bp.symbol_name = op.symbol;
+                bp.section_name = m_current_section;
+                bp.offset = current_offset() - 4;
+                bp.type = backpatch_type::RELOC;
+                m_backpatch_table.push_back(bp);
             }
             break;
         }
         default:
-            throw std::runtime_error("Invalid operand type for st instruction");
+            throw std::runtime_error("Invalid operand type for jump/call instruction");
     }
 }

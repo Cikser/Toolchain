@@ -82,6 +82,7 @@ void as::assembler::dir_word(const std::vector<value_t>& values) {
                 bp.offset = current_offset();
                 bp.section_name = current_section().name;
                 bp.symbol_name = symbol_name;
+                bp.type = backpatch_type::RELOC;
                 m_backpatch_table.push_back(bp);
                 emit_word(0);
             }

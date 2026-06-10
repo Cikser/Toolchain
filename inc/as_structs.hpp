@@ -13,6 +13,16 @@ namespace as {
     #define SECTION_UNDEF "UNDEF"
     #define SECTION_ABS "ABS"
 
+    enum class reloaction_type { R_PC_REL, R_32 };
+
+    struct relocation_t {
+        std::string section_name;
+        std::string symbol_name;
+        int32_t addend = 0;
+        uint32_t offset = 0;
+        reloaction_type type;
+    };
+
     struct symbol_t {
         std::string name;
         std::string section = SECTION_UNDEF;
@@ -26,23 +36,20 @@ namespace as {
     struct section_t {
         std::string name;
         std::vector<uint8_t> data;
+        std::vector<relocation_t> relocations;
     };
 
-    enum class reloaction_type { R_PC_REL, R_32 };
-
-    struct relocation_t {
-        std::string section_name;
-        std::string symbol_name;
-        int32_t addend = 0;
-        uint32_t offset = 0;
-        reloaction_type type;
+    enum class backpatch_type {
+        DEFAULT,
+        BOUNDS,
+        RELOC
     };
 
     struct backpatch_t {
         std::string symbol_name;
         std::string section_name;
         uint32_t offset = 0;
-        bool needs_check = false;
+        backpatch_type type = backpatch_type::DEFAULT;
     };
 
     enum class operand_type {

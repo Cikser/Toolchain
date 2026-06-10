@@ -73,6 +73,10 @@ namespace as {
             void emit_jump_or_call(uint8_t oc, uint8_t mod_direct, uint8_t mod_mem,
                         uint8_t regB, uint8_t regC, const operand_t& op);
 
+            void emit_jump_and_literal(int32_t literal);
+            void emit_pool_ld(int32_t reg, int32_t literal);
+            void emit_pool_st(int32_t reg, int32_t literal);
+
             void emit_ld(const operand_t& op, int32_t reg);
             void emit_st(int32_t reg, const operand_t& op);
 
