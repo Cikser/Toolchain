@@ -200,5 +200,67 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
             emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, (uint8_t)op.reg, 0x0, (int16_t)op.literal));
             break;
         }
+        default:
+            throw std::runtime_error("Invalid operand type for st instruction");
+    }
+}
+
+void as::assembler::emit_st(int32_t reg, const operand_t& op) {
+    switch (op.type) {
+        case operand_type::LITERAL_MEM: {
+            if (check_bounds(op.literal)) {
+                emit_instruction(encode_instruction(0x8, 0x0, 0x0, 0x0, (uint8_t)reg, op.literal));
+            }
+            else {
+                // todo literal pool
+            }
+            break;
+        }
+        case operand_type::SYMBOL_MEM: {
+            auto it = m_sym_table.find(op.symbol);
+            if (it != m_sym_table.end()) {
+                if (it->second.absolute && check_bounds(it->second.value)) {
+                    emit_instruction(encode_instruction(0x8, 0x0, 0x0, 0x0, (uint8_t)reg, (int16_t)it->second.value));
+                }
+                else if (it->second.defined && it->second.section == m_current_section && check_bounds(it->second.value - (current_offset() + 4))) {
+                    emit_instruction(encode_instruction(0x8, 0x0, 0x0, 0xF, (uint8_t)reg, (int16_t)(it->second.value - (current_offset() + 4))));
+                }
+                else {
+                    // todo literal pool / reloc
+                }
+            }
+            else {
+                symbol_t sym{};
+                sym.name = op.symbol;
+                sym.section = SECTION_UNDEF;
+                m_sym_table.insert({op.symbol, sym});
+                // todo literal pool / reloc
+            }
+            break;
+        }
+        case operand_type::REG_INDIRECT: {
+            emit_instruction(encode_instruction(0x8, 0x0, (uint8_t)op.reg, 0x0, (uint8_t)reg, 0x0));
+            break;
+        }
+        case operand_type::REG_OFFSET_LIT: {
+            if (!check_bounds(op.literal)) {
+                throw std::runtime_error("Literal offset does not fit in 12-bit signed displacement");
+            }
+            emit_instruction(encode_instruction(0x8, 0x0, (uint8_t)op.reg, 0x0, (uint8_t)reg, op.literal));
+            break;
+        }
+        case operand_type::REG_OFFSET_SYM: {
+            auto it = m_sym_table.find(op.symbol);
+            if (it == m_sym_table.end() || !it->second.defined || !it->second.absolute) {
+                throw std::runtime_error("Symbol offset must be absolute and known: " + op.symbol);
+            }
+            if (!check_bounds(it->second.value)) {
+                throw std::runtime_error("Symbol " + it->second.name + " offset does not fit in 12-bit signed displacement");
+            }
+            emit_instruction(encode_instruction(0x8, 0x0, 0x0, (uint8_t)op.reg, (uint8_t)reg, (int16_t)op.literal));
+            break;
+        }
+        default:
+            throw std::runtime_error("Invalid operand type for st instruction");
     }
 }
