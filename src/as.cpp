@@ -80,3 +80,68 @@ as::section_t& as::assembler::current_section() {
 bool as::assembler::check_bounds(int32_t literal) {
     return literal >= -2048 && literal <= 2047;
 } 
+
+void as::assembler::resolve_backpatch() {
+    bool change = true;
+    while (change) {
+        change = false;
+        for (auto iterator = m_backpatch_table.begin(); iterator != m_backpatch_table.end(); ++iterator) {
+            backpatch_t& bp = *iterator;
+            auto it = m_sym_table.find(bp.symbol_name);
+            if (it == m_sym_table.end()) {
+                continue;
+            }
+            symbol_t& sym = it->second;
+            switch (bp.type) {
+                case backpatch_type::BOUNDS: {
+                    if (sym.absolute && check_bounds(sym.value)) {
+                        section_t& section = m_section_table.at(bp.section_name);
+                        section.data[bp.offset] = (section.data[bp.offset] & 0xF0) | (sym.value & (0xF << 8));
+                        section.data[bp.offset + 1] = sym.value & 0xFF;
+                    }
+                    else if (sym.absolute && !check_bounds(sym.value)) {
+                        throw std::runtime_error("Symbol " + sym.name + " offset does not fit in 12-bit signed displacement");
+                    }
+                    else {
+                        throw std::runtime_error("Symbol offset must be absolute and known: " + sym.name);
+                    }
+                    break;
+                }
+                case backpatch_type::RELOC: {
+                    if (sym.absolute) {
+                        section_t& section = m_section_table.at(bp.section_name);
+                        section.data[bp.offset] = sym.value & 0xFF;
+                        section.data[bp.offset + 1] = sym.value & 0xFF << 8;
+                        section.data[bp.offset + 2] = sym.value & 0xFF << 16;
+                        section.data[bp.offset + 3] = sym.value & 0xFF << 24;
+                    }
+                    else {
+                        relocation_t reloc{};
+                        reloc.section_name = bp.section_name;
+                        reloc.offset = bp.offset;
+                        reloc.type = reloaction_type::R_32;
+                        if (sym.global) {
+                            reloc.symbol_name = sym.name;
+                            reloc.addend = 0;
+                        }
+                        else {
+                            reloc.symbol_name = sym.section;
+                            reloc.addend = sym.value;
+                        }
+                        section_t& section = m_section_table.find(sym.section)->second;
+                        section.relocations.push_back(reloc);
+
+                    }
+                }
+                default:
+                    throw std::runtime_error("Unable to complete backpatch");
+            }
+            m_backpatch_table.erase(iterator);
+            change = true;
+            break;
+        }
+    }
+    if (!m_backpatch_table.empty()) {
+        throw std::runtime_error("Unable to complete backpatch");
+    }
+}

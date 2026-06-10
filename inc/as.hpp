@@ -81,6 +81,8 @@ namespace as {
             void emit_st(int32_t reg, const operand_t& op);
 
             bool check_bounds(int32_t literal);
+
+            void resolve_backpatch();
     };
 
 }
