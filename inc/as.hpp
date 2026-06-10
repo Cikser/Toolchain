@@ -75,6 +75,8 @@ namespace as {
 
             void emit_ld(const operand_t& op, int32_t reg);
             void emit_st(int32_t reg, const operand_t& op);
+
+            bool check_bounds(int32_t literal);
     };
 
 }

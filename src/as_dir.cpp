@@ -52,6 +52,7 @@ void as::assembler::dir_section(const std::string& section_name) {
         m_current_section = section_name;
         symbol_t sym{};
         sym.name = section_name;
+        sym.section = SECTION_UNDEF;
         sym.defined = true;
     }
     else {
@@ -73,6 +74,7 @@ void as::assembler::dir_word(const std::vector<value_t>& values) {
             else {
                 if (it == m_sym_table.end()) {
                     symbol_t sym{};
+                    sym.section = SECTION_UNDEF;
                     sym.name = symbol_name;
                     m_sym_table.insert({symbol_name, sym});
                 }
@@ -113,6 +115,7 @@ void as::assembler::dir_equ(const std::string& symbol_name, int32_t value) {
     else {
         symbol_t sym{};
         sym.name = symbol_name;
+        sym.section = SECTION_UNDEF;
         sym.value = value;
         sym.absolute = true;
         sym.defined = true;
