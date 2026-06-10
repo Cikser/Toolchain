@@ -264,3 +264,42 @@ void as::assembler::emit_st(int32_t reg, const operand_t& op) {
             throw std::runtime_error("Invalid operand type for st instruction");
     }
 }
+
+void as::assembler::emit_jump_or_call(uint8_t oc, uint8_t mod_direct, uint8_t mod_mem,
+                        uint8_t regB, uint8_t regC, const operand_t& op) {
+    switch (op.type) {
+        case operand_type::LITERAL_MEM: {
+            if (check_bounds(op.literal)) {
+                emit_instruction(encode_instruction(oc, mod_direct, 0x0, regB, regC, op.literal));
+            }
+            else {
+                // todo literal pool
+            }
+            break;
+        }
+        case operand_type::SYMBOL_MEM: {
+            auto it = m_sym_table.find(op.symbol);
+            if (it != m_sym_table.end()) {
+                if (it->second.absolute && check_bounds(it->second.value)) {
+                    emit_instruction(encode_instruction(oc, mod_direct, 0x0, regB, regC, it->second.value))
+                }
+                else if (it->second.defined && it->second.section == m_current_section && check_bounds(it->second.value - (current_offset() + 4))) {
+                    emit_instruction(encode_instruction(oc, mod_direct, 0xF, regB, regC, (int16_t)(it->second.value - (current_offset() + 4))));
+                }
+                else {
+                    // todo literal pool / reloc
+                }
+            }
+            else {
+                symbol_t sym{};
+                sym.name = op.symbol;
+                sym.section = SECTION_UNDEF;
+                m_sym_table.insert({op.symbol, sym});
+                // todo literal pool / reloc
+            }
+            break;
+        }
+        default:
+            throw std::runtime_error("Invalid operand type for st instruction");
+    }
+}
