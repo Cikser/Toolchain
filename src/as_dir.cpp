@@ -11,6 +11,7 @@ void as::assembler::dir_global(const std::vector<std::string>& symbols) {
             symbol_t sym{};
             sym.name = symbol_name;
             sym.global = true;
+            sym.section = SECTION_UNDEF;
             m_sym_table.insert({symbol_name, sym});
         }
     }
@@ -24,12 +25,13 @@ void as::assembler::dir_extern(const std::vector<std::string>& symbols) {
                 throw std::runtime_error("Symbol " + symbol_name + " already defined");
             }
             else {
-                it->second.global = true; // todo mozda ne treba ovako, mozda treba da se detektuje greska ???
+                it->second.global = true;
             }    
         }
         else {
             symbol_t sym{};
             sym.name = symbol_name;
+            sym.section = SECTION_UNDEF;
             sym.global = true;
             sym.is_extern = true;
             m_sym_table.insert({symbol_name, sym});
@@ -47,13 +49,13 @@ void as::assembler::dir_section(const std::string& section_name) {
         section_t section{};
         section.name = section_name;
         m_section_table.insert({section_name, section});
-        m_current_section = section;
+        m_current_section = &m_section_table.at(section_name);
         symbol_t sym{};
         sym.name = section_name;
         sym.defined = true;
     }
     else {
-        m_current_section = it->second;
+        m_current_section = &it->second;
     }
 }
 
@@ -76,7 +78,7 @@ void as::assembler::dir_word(const std::vector<value_t>& values) {
                 }
                 backpatch_t bp{};
                 bp.offset = current_offset();
-                bp.section_name = m_current_section.name;
+                bp.section_name = m_current_section->name;
                 bp.symbol_name = symbol_name;
                 emit_word(0);
             }
@@ -94,7 +96,7 @@ void as::assembler::dir_ascii(const std::string& string) {
     for (const auto& ch : string) {
         emit_byte((uint8_t)ch);
     }
-    emit_byte((uint8_t)'\0'); // todo mozda treba ??
+    emit_byte((uint8_t)'\0');
 }
 
 void as::assembler::dir_equ(const std::string& symbol_name, int32_t value) {

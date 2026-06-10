@@ -11,7 +11,7 @@ namespace as {
     class assembler {
 
         public:
-            assembler() = default;
+            assembler();
 
             void assemble(const std::string& input_path, const std::string& output_path);
 
@@ -27,9 +27,10 @@ namespace as {
             void define_label(const std::string& name);
 
         private:
+
             std::unordered_map<std::string, symbol_t> m_sym_table;
             std::unordered_map<std::string, section_t> m_section_table;
-            section_t& m_current_section;
+            section_t* m_current_section = nullptr;
 
             void emit_byte(uint8_t byte);
             void emit_word(uint32_t word);

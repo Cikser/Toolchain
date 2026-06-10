@@ -25,10 +25,25 @@ namespace as {
         std::vector<uint8_t> data;
     };
 
+
+    #define SECTION_UNDEF "UNDEF"
+    #define SECTION_ABS "ABS"
+
+    enum class reloaction_type { R_PC_REL, R_32 };
+
+    struct relocation_t {
+        std::string section_name;
+        std::string symbol_name;
+        int32_t addend = 0;
+        uint32_t offset = 0;
+        reloaction_type type;
+    };
+
     struct backpatch_t {
         std::string symbol_name;
         std::string section_name;
-        uint32_t offset;
+        uint32_t offset = 0;
+        relocation_t reloc{};
     };
 
 }
