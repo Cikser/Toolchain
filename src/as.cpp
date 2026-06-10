@@ -39,6 +39,17 @@ void as::assembler::emit_word(uint32_t word) {
     emit_byte(word & (0xFF << 24));
 }
 
+void as::assembler::emit_instruction(uint32_t instr) {
+    emit_word(instr);
+}
+
 uint32_t as::assembler::current_offset() {
     return current_section().data.size();
+}
+
+as::section_t& as::assembler::current_section() {
+    if (m_current_section == SECTION_UNDEF) {
+        throw std::runtime_error("No active section, use .section before emitting data");
+    }
+    return m_section_table.at(m_current_section);
 }

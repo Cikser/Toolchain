@@ -44,6 +44,24 @@ namespace as {
         uint32_t offset = 0;
     };
 
+    enum class operand_type {
+        LITERAL_IMM,
+        SYMBOL_IMM,
+        LITERAL_MEM,
+        SYMBOL_MEM,
+        REG_DIRECT,
+        REG_INDIRECT,
+        REG_OFFSET_LIT,
+        REG_OFFSET_SYM,
+    };
+
+    struct operand_t {
+        int32_t literal;
+        std::string symbol;
+        int32_t reg;
+        operand_type type;
+    };
+
 }
 
 #endif
