@@ -1,4 +1,4 @@
-#include "inc/as.hpp"
+#include "as.hpp"
 #include <stdexcept>
 
 void as::assembler::dir_global(const std::vector<std::string>& symbols) {
