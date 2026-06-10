@@ -10,9 +10,12 @@ namespace as {
 
     typedef std::variant<std::string, int32_t> value_t;
 
+    #define SECTION_UNDEF "UNDEF"
+    #define SECTION_ABS "ABS"
+
     struct symbol_t {
         std::string name;
-        std::string section;
+        std::string section = SECTION_UNDEF;
         int32_t value = 0;
         bool absolute = false;
         bool global = false;
@@ -24,10 +27,6 @@ namespace as {
         std::string name;
         std::vector<uint8_t> data;
     };
-
-
-    #define SECTION_UNDEF "UNDEF"
-    #define SECTION_ABS "ABS"
 
     enum class reloaction_type { R_PC_REL, R_32 };
 
@@ -43,7 +42,6 @@ namespace as {
         std::string symbol_name;
         std::string section_name;
         uint32_t offset = 0;
-        relocation_t reloc{};
     };
 
 }

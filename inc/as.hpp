@@ -30,12 +30,13 @@ namespace as {
 
             std::unordered_map<std::string, symbol_t> m_sym_table;
             std::unordered_map<std::string, section_t> m_section_table;
-            section_t* m_current_section = nullptr;
+            std::string m_current_section = SECTION_UNDEF;
 
             void emit_byte(uint8_t byte);
             void emit_word(uint32_t word);
 
             uint32_t current_offset();
+            section_t& current_section();
     };
 
 }

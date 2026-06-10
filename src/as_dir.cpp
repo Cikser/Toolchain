@@ -49,13 +49,13 @@ void as::assembler::dir_section(const std::string& section_name) {
         section_t section{};
         section.name = section_name;
         m_section_table.insert({section_name, section});
-        m_current_section = &m_section_table.at(section_name);
+        m_current_section = section_name;
         symbol_t sym{};
         sym.name = section_name;
         sym.defined = true;
     }
     else {
-        m_current_section = &it->second;
+        m_current_section = it->second.name;
     }
 }
 
@@ -78,7 +78,7 @@ void as::assembler::dir_word(const std::vector<value_t>& values) {
                 }
                 backpatch_t bp{};
                 bp.offset = current_offset();
-                bp.section_name = m_current_section->name;
+                bp.section_name = current_section().name;
                 bp.symbol_name = symbol_name;
                 emit_word(0);
             }
