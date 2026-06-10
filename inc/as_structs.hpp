@@ -13,10 +13,11 @@ namespace as {
     struct symbol_t {
         std::string name;
         std::string section;
-        int32_t value;
-        bool absolute;
-        bool global;
-        bool defined;
+        int32_t value = 0;
+        bool absolute = false;
+        bool global = false;
+        bool defined = false;
+        bool is_extern = false;
     };
 
     struct section_t {

@@ -1,10 +1,21 @@
 #include "as.hpp"
+#include <stdexcept>
 
 void as::assembler::define_label(const std::string& name) {
     auto it = m_sym_table.find(name);
     if (it != m_sym_table.end()) {
+        if (it->second.is_extern || it->second.defined) {
+            throw std::runtime_error("Symbol " + name + " already defined");
+        }
         it->second.defined = true;
         it->second.section = m_current_section.name;
+    }
+    else {
+        symbol_t sym{};
+        sym.defined = true;
+        sym.name = name;
+        sym.section = m_current_section.name;
+        sym.value = current_offset();
     }
 }
 
