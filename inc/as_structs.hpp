@@ -42,6 +42,7 @@ namespace as {
         std::string symbol_name;
         std::string section_name;
         uint32_t offset = 0;
+        bool needs_check = false;
     };
 
     enum class operand_type {

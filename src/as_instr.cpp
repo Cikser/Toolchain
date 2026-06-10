@@ -191,14 +191,30 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
         }
         case operand_type::REG_OFFSET_SYM: {
             auto it = m_sym_table.find(op.symbol);
-            if (it == m_sym_table.end() || !it->second.defined || !it->second.absolute) {
-                throw std::runtime_error("Symbol offset must be absolute and known: " + op.symbol);
+            if (it != m_sym_table.end() && it->second.defined && it->second.absolute && check_bounds(it->second.value)) {
+                emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, op.reg, 0x0, it->second.value));
             }
-            if (!check_bounds(it->second.value)) {
+            else if (it != m_sym_table.end() && it->second.defined && it->second.absolute && !check_bounds(it->second.value)) {
                 throw std::runtime_error("Symbol " + it->second.name + " offset does not fit in 12-bit signed displacement");
             }
-            emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, (uint8_t)op.reg, 0x0, (int16_t)op.literal));
-            break;
+            else if (it != m_sym_table.end() && (it->second.is_extern || (it->second.defined && !it->second.absolute))) {
+                throw std::runtime_error("Symbol offset must be absolute and known: " + op.symbol);
+            }
+            else {
+                if (it == m_sym_table.end()) {
+                    symbol_t sym{};
+                    sym.name = op.symbol;
+                    sym.section = SECTION_UNDEF;
+                    m_sym_table.insert({op.symbol, sym});
+                }
+                backpatch_t bp{};
+                bp.section_name = m_current_section;
+                bp.symbol_name = op.symbol;
+                bp.offset = current_offset() + 2;
+                bp.needs_check = true;
+                m_backpatch_table.push_back(bp);
+                emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, op.reg, 0x0, 0x0));
+            }
         }
         default:
             throw std::runtime_error("Invalid operand type for st instruction");
@@ -251,13 +267,30 @@ void as::assembler::emit_st(int32_t reg, const operand_t& op) {
         }
         case operand_type::REG_OFFSET_SYM: {
             auto it = m_sym_table.find(op.symbol);
-            if (it == m_sym_table.end() || !it->second.defined || !it->second.absolute) {
-                throw std::runtime_error("Symbol offset must be absolute and known: " + op.symbol);
+            if (it != m_sym_table.end() && it->second.defined && it->second.absolute && check_bounds(it->second.value)) {
+                emit_instruction(encode_instruction(0x8, 0x0, (uint8_t)op.reg, 0x0, (uint8_t)reg, it->second.value));
             }
-            if (!check_bounds(it->second.value)) {
+            else if (it != m_sym_table.end() && it->second.defined && it->second.absolute && !check_bounds(it->second.value)) {
                 throw std::runtime_error("Symbol " + it->second.name + " offset does not fit in 12-bit signed displacement");
             }
-            emit_instruction(encode_instruction(0x8, 0x0, 0x0, (uint8_t)op.reg, (uint8_t)reg, (int16_t)op.literal));
+            else if (it != m_sym_table.end() && (it->second.is_extern || (it->second.defined && !it->second.absolute))) {
+                throw std::runtime_error("Symbol offset must be absolute and known: " + op.symbol);
+            }
+            else {
+                if (it == m_sym_table.end()) {
+                    symbol_t sym{};
+                    sym.name = op.symbol;
+                    sym.section = SECTION_UNDEF;
+                    m_sym_table.insert({op.symbol, sym});
+                }
+                backpatch_t bp{};
+                bp.section_name = m_current_section;
+                bp.symbol_name = op.symbol;
+                bp.offset = current_offset() + 2;
+                bp.needs_check = true;
+                m_backpatch_table.push_back(bp);
+                emit_instruction(encode_instruction(0x8, 0x0, (uint8_t)op.reg, 0x0, (uint8_t)reg, 0x0));
+            }
             break;
         }
         default:
@@ -281,7 +314,7 @@ void as::assembler::emit_jump_or_call(uint8_t oc, uint8_t mod_direct, uint8_t mo
             auto it = m_sym_table.find(op.symbol);
             if (it != m_sym_table.end()) {
                 if (it->second.absolute && check_bounds(it->second.value)) {
-                    emit_instruction(encode_instruction(oc, mod_direct, 0x0, regB, regC, it->second.value))
+                    emit_instruction(encode_instruction(oc, mod_direct, 0x0, regB, regC, it->second.value));
                 }
                 else if (it->second.defined && it->second.section == m_current_section && check_bounds(it->second.value - (current_offset() + 4))) {
                     emit_instruction(encode_instruction(oc, mod_direct, 0xF, regB, regC, (int16_t)(it->second.value - (current_offset() + 4))));

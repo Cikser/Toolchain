@@ -46,11 +46,11 @@ void as::assembler::emit_instruction(uint32_t instr) {
     emit_word(instr);
 }
 
-static constexpr uint32_t INSTR_OFFSET = 28;
-static constexpr uint32_t MODF_OFFSET = 24;
-static constexpr uint32_t REGA_OFFSET = 20;
-static constexpr uint32_t REGB_OFFSET = 16;
-static constexpr uint32_t REGC_OFFSET = 12;
+static constexpr uint32_t INSTR_OFFSET = 4;
+static constexpr uint32_t MODF_OFFSET = 0;
+static constexpr uint32_t REGA_OFFSET = 12;
+static constexpr uint32_t REGB_OFFSET = 8;
+static constexpr uint32_t REGC_OFFSET = 20;
 
 static constexpr uint32_t INSTR_MASK = 0xF;
 static constexpr uint32_t MODF_MASK = 0xF;
