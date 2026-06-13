@@ -20,7 +20,7 @@ namespace as {
         void dir_word(const std::vector<value_t>& values);
         void dir_skip(uint32_t count);
         void dir_ascii(const std::string& string);
-        void dir_equ(const std::string& symbol_name, int32_t value);
+        void dir_equ(const std::string& symbol_name, std::shared_ptr<expr_node_t> expr);
         void dir_end();
 
         void define_label(const std::string& name);
@@ -57,6 +57,7 @@ namespace as {
         std::unordered_map<std::string, symbol_t> m_sym_table;
         std::unordered_map<std::string, section_t> m_section_table;
         std::vector<backpatch_t> m_backpatch_table;
+        std::vector<pending_equ_t> m_pequ_table;
         std::string m_current_section = SECTION_UNDEF;
         uint32_t m_sec_idx = 1;
 
@@ -83,6 +84,9 @@ namespace as {
         bool check_bounds(int32_t literal);
 
         void resolve_backpatch();
+        void resolve_pequs();
+
+        eval_result_t try_eval_expr(std::shared_ptr<expr_node_t>& expr, bool final = false);
 
         void write_elf(const std::string& path);
         void write_dump(const std::string& path);

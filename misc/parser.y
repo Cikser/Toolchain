@@ -20,7 +20,8 @@ void yyerror(as::assembler* as, const char* msg) {
     char*       str;
     as::operand_t*                    operand;
     std::vector<std::string>*         str_list;
-    std::vector<as::value_t>*    word_list;
+    std::vector<as::value_t>*         word_list;
+    as::expr_node_t*                  expr;
 }
 
 %token TOK_HALT TOK_INT TOK_IRET TOK_RET
@@ -52,6 +53,7 @@ void yyerror(as::assembler* as, const char* msg) {
 %type <operand>   operand
 %type <str_list>  symbol_list
 %type <word_list> word_list
+%type <expr>      equ_expr
 
 %left TOK_PLUS TOK_MINUS
 %left TOK_STAR TOK_SLASH
@@ -81,6 +83,73 @@ statement
     | instruction
     ;
 
+equ_expr
+    : equ_expr TOK_PLUS equ_expr
+        {
+            auto* n = new as::expr_node_t();
+            n->is_binary = true;
+            n->type = as::expr_type::ADD;
+            n->left = std::shared_ptr<as::expr_node_t>($1);
+            n->right = std::shared_ptr<as::expr_node_t>($3);
+            $$ = n;
+        }
+    | equ_expr TOK_MINUS equ_expr
+        {
+            auto* n = new as::expr_node_t();
+            n->is_binary = true;
+            n->type = as::expr_type::SUB;
+            n->left = std::shared_ptr<as::expr_node_t>($1);
+            n->right = std::shared_ptr<as::expr_node_t>($3);
+            $$ = n;
+        }
+    | equ_expr TOK_STAR equ_expr
+        {
+            auto* n = new as::expr_node_t();
+            n->is_binary = true;
+            n->type = as::expr_type::MUL;
+            n->left = std::shared_ptr<as::expr_node_t>($1);
+            n->right = std::shared_ptr<as::expr_node_t>($3);
+            $$ = n;
+        }
+    | equ_expr TOK_SLASH equ_expr
+        {
+            auto* n = new as::expr_node_t();
+            n->is_binary = true;
+            n->type = as::expr_type::DIV;
+            n->left = std::shared_ptr<as::expr_node_t>($1);
+            n->right = std::shared_ptr<as::expr_node_t>($3);
+            $$ = n;
+        }
+    | TOK_MINUS equ_expr %prec UMINUS
+        {
+            auto* zero = new as::expr_node_t();
+            zero->is_literal = true;
+            zero->literal = 0;
+            auto* n = new as::expr_node_t();
+            n->is_binary = true;
+            n->type = as::expr_type::SUB;
+            n->left = std::shared_ptr<as::expr_node_t>(zero);
+            n->right = std::shared_ptr<as::expr_node_t>($2);
+            $$ = n;
+        }
+    | TOK_LITERAL
+        {
+            auto* n = new as::expr_node_t();
+            n->is_literal = true;
+            n->literal = $1;
+            $$ = n;
+        }
+    | TOK_SYMBOL
+        {
+            auto* n = new as::expr_node_t();
+            n->is_literal = false;
+            n->is_binary = false;
+            n->symbol = $1;
+            free($1);
+            $$ = n;
+        }
+    ;
+
 directive
     : TOK_DGLOBAL symbol_list
         { as->dir_global(*$2); delete $2; }
@@ -94,11 +163,8 @@ directive
         { as->dir_skip((uint32_t)$2); }
     | TOK_DASCII TOK_STRING
         { as->dir_ascii($2); free($2); }
-    | TOK_DEQU TOK_SYMBOL TOK_COMMA TOK_LITERAL
-        {
-            as->dir_equ($2, $4);
-            free($2);
-        }
+    | TOK_DEQU TOK_SYMBOL TOK_COMMA equ_expr
+        { as->dir_equ($2, std::shared_ptr<as::expr_node_t>($4)); }
     | TOK_DEND
         { as->dir_end(); YYACCEPT; }
     ;

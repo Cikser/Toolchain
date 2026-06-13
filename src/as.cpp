@@ -1,5 +1,6 @@
 #include "as.hpp"
 #include <stdexcept>
+#include <iostream>
 
 as::assembler::assembler() {
     section_t section_undef{};
@@ -145,7 +146,6 @@ void as::assembler::resolve_backpatch() {
                     throw std::runtime_error("Unable to complete backpatch");    
                 }
             }
-            
             m_backpatch_table.erase(iterator);
             change = true;
             break;
@@ -153,5 +153,100 @@ void as::assembler::resolve_backpatch() {
     }
     if (!m_backpatch_table.empty()) {
         throw std::runtime_error("Unable to complete backpatch");
+    }
+}
+
+as::eval_result_t as::assembler::try_eval_expr(std::shared_ptr<expr_node_t>& expr, bool final) {
+    eval_result_t out{};
+    if (!expr->is_binary) {
+        if (expr->is_literal) {
+            out.value = expr->literal;
+            out.absolute = true;
+            out.valid = true;
+            return out;
+        }
+        auto it = m_sym_table.find(expr->symbol);
+        if (it != m_sym_table.end()) {
+            symbol_t& sym = it->second;
+            if (it->second.absolute && it->second.defined) {
+                out.value = it->second.value;
+                out.valid = true;
+                out.absolute = true;
+                return out;
+            }
+            else {
+                out.value = sym.value;
+                out.section = sym.section;
+                out.valid = true;
+                return out;
+            }
+        }
+        symbol_t sym{};
+        sym.name = expr->symbol;
+        m_sym_table.insert({sym.name, sym});
+        out.valid = false;
+        return out;
+    }
+    eval_result_t left = try_eval_expr(expr->left);
+    eval_result_t right = try_eval_expr(expr->right);
+    switch (expr->type) {
+        case expr_type::ADD: {
+            out.value = left.value + right.value;
+            break;
+        }
+        case expr_type::SUB: {
+            out.value = left.value - right.value;
+            break;
+        }
+        case expr_type::MUL: {
+            out.value = left.value * right.value;
+            break;
+        }
+        case expr_type::DIV: {
+            out.value = left.value / right.value;
+            break;
+        }
+    }
+    if (left.absolute && right.absolute) {
+        out.absolute = true;
+        out.valid = true;
+        return out;
+    }
+    if ((expr->type == expr_type::MUL || expr->type == expr_type::DIV) && (!left.absolute || !right.absolute)) {
+        return out;
+    }
+    if (!left.absolute && !right.absolute && left.section != right.section) {
+        return out;
+    }
+    if (!left.absolute && !right.absolute && left.section == right.section && final) {
+        out.absolute = true;
+        out.valid = true;
+        return out;
+    }
+    out.valid = true;
+    return out;
+}
+
+void as::assembler::resolve_pequs() {
+    bool change = true;
+    while (change) {
+        change = false;
+        for (auto iterator = m_pequ_table.begin(); iterator != m_pequ_table.end(); ++iterator) {
+            pending_equ_t& pequ = *iterator;
+            eval_result_t result = try_eval_expr(pequ.expr, true);
+            if (!result.absolute) {
+                continue;
+            }
+            symbol_t& sym = m_sym_table.at(pequ.symbol);
+            sym.value = result.value;
+            sym.defined = true;
+            sym.absolute = true;
+            change = true;
+            m_pequ_table.erase(iterator);
+            break;
+        }
+    }
+    if (!m_pequ_table.empty()) {
+        throw std::runtime_error("Unable to complete .equ evaluation");
     }
 }

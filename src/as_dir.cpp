@@ -105,24 +105,40 @@ void as::assembler::dir_ascii(const std::string& string) {
     emit_byte((uint8_t)'\0');
 }
 
-void as::assembler::dir_equ(const std::string& symbol_name, int32_t value) {
+void as::assembler::dir_equ(const std::string& symbol_name, std::shared_ptr<expr_node_t> expr) {
     auto it = m_sym_table.find(symbol_name);
     if (it != m_sym_table.end() && (it->second.defined || it->second.is_extern)) {
         throw std::runtime_error("Symbol " + symbol_name + " already defined");
     }
-    if (it != m_sym_table.end()) {
-        it->second.absolute = true;
-        it->second.defined = true;
-        it->second.value = value;
+    eval_result_t result = try_eval_expr(expr);
+    if (result.absolute) {
+        if (it != m_sym_table.end()) {
+            it->second.absolute = true;
+            it->second.defined = true;
+            it->second.value = result.value;
+        }
+        else {
+            symbol_t sym{};
+            sym.absolute = true;
+            sym.name = symbol_name;
+            sym.section = SECTION_ABS;
+            sym.defined = true;
+            sym.value = result.value;
+            m_sym_table.insert({symbol_name, sym});
+        }
     }
     else {
-        symbol_t sym{};
-        sym.name = symbol_name;
-        sym.section = SECTION_ABS;
-        sym.value = value;
-        sym.absolute = true;
-        sym.defined = true;
-        m_sym_table.insert({symbol_name, sym});
+        if (it == m_sym_table.end()) {
+            symbol_t sym{};
+            sym.absolute = true;
+            sym.name = symbol_name;
+            sym.section = SECTION_ABS;
+            m_sym_table.insert({symbol_name, sym});
+        }
+        pending_equ_t pequ{};
+        pequ.expr = expr;
+        pequ.symbol = symbol_name;
+        m_pequ_table.push_back(pequ);
     }
 }
 

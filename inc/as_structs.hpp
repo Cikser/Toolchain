@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <cstdint>
+#include <memory>
 
 namespace as {
 
@@ -75,6 +76,34 @@ namespace as {
         operand_type type;
     };
 
+    enum class expr_type {
+        ADD,
+        SUB,
+        MUL,
+        DIV
+    };
+
+    struct expr_node_t {
+        std::shared_ptr<expr_node_t> left;
+        std::shared_ptr<expr_node_t> right;
+        int32_t literal;
+        std::string symbol;
+        expr_type type;
+        bool is_binary;
+        bool is_literal;
+    };
+
+    struct pending_equ_t {
+        std::string symbol;
+        std::shared_ptr<expr_node_t> expr;
+    };
+
+    struct eval_result_t {
+        std::string section = SECTION_UNDEF;
+        int32_t value = 0;
+        bool absolute = false;
+        bool valid = false;
+    };
 }
 
 #endif

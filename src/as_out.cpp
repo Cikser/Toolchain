@@ -18,6 +18,7 @@ void as::assembler::assemble(const std::string& input_path, const std::string& o
     fclose(f);
     if (result != 0)
         throw std::runtime_error("Parse error in file: " + input_path);
+    resolve_pequs();
     resolve_backpatch();
     write_elf(output_path + ".o");
     write_dump(output_path + ".txt");
