@@ -13,14 +13,17 @@ namespace as {
     #define SECTION_UNDEF "UNDEF"
     #define SECTION_ABS "ABS"
 
-    enum class reloaction_type { R_PC_REL, R_32 };
+    #define SECTION_UNDEF_IDX 0
+    #define SECTION_ABS_IDX ((uint32_t)-1)
+
+    enum class relocation_type { R_PC_REL, R_32 };
 
     struct relocation_t {
         std::string section_name;
         std::string symbol_name;
         int32_t addend = 0;
         uint32_t offset = 0;
-        reloaction_type type;
+        relocation_type type;
     };
 
     struct symbol_t {
@@ -35,6 +38,7 @@ namespace as {
 
     struct section_t {
         std::string name;
+        uint32_t idx = 0;
         std::vector<uint8_t> data;
         std::vector<relocation_t> relocations;
     };
@@ -42,7 +46,8 @@ namespace as {
     enum class backpatch_type {
         DEFAULT,
         BOUNDS,
-        RELOC
+        RELOC,
+        RELOC_PURE
     };
 
     struct backpatch_t {

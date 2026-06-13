@@ -156,13 +156,12 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                 }
                 else {
                     emit_pool_ld(reg, 0);
-                    relocation_t reloc{};
-                    reloc.section_name = m_current_section;
-                    reloc.symbol_name = op.symbol;
-                    reloc.type = reloaction_type::R_32;
-                    reloc.addend = 0;
-                    reloc.offset = current_offset() - 4;
-                    current_section().relocations.push_back(reloc);
+                    backpatch_t bp{};
+                    bp.section_name = m_current_section;
+                    bp.symbol_name = op.symbol;
+                    bp.offset = current_offset() - 4;
+                    bp.type = backpatch_type::RELOC;
+                    m_backpatch_table.push_back(bp);
                 }
             }
             else {
@@ -209,13 +208,12 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                 }
                 else {
                     emit_pool_ld(reg, 0);
-                    relocation_t reloc{};
-                    reloc.section_name = m_current_section;
-                    reloc.symbol_name = op.symbol;
-                    reloc.type = reloaction_type::R_32;
-                    reloc.addend = 0;
-                    reloc.offset = current_offset() - 4;
-                    current_section().relocations.push_back(reloc);
+                    backpatch_t bp{};
+                    bp.section_name = m_current_section;
+                    bp.symbol_name = op.symbol;
+                    bp.offset = current_offset() - 4;
+                    bp.type = backpatch_type::RELOC;
+                    m_backpatch_table.push_back(bp);
                 }
             }
             else {
@@ -312,13 +310,12 @@ void as::assembler::emit_st(int32_t reg, const operand_t& op) {
                 }
                 else {
                     emit_pool_st(reg, 0);
-                    relocation_t reloc{};
-                    reloc.section_name = m_current_section;
-                    reloc.symbol_name = op.symbol;
-                    reloc.type = reloaction_type::R_32;
-                    reloc.addend = 0;
-                    reloc.offset = current_offset() - 4;
-                    current_section().relocations.push_back(reloc);
+                    backpatch_t bp{};
+                    bp.section_name = m_current_section;
+                    bp.symbol_name = op.symbol;
+                    bp.offset = current_offset() - 4;
+                    bp.type = backpatch_type::RELOC;
+                    m_backpatch_table.push_back(bp);
                 }
             }
             else {
@@ -416,13 +413,12 @@ void as::assembler::emit_jump_or_call(uint8_t oc, uint8_t mod_direct, uint8_t mo
                 else {
                     emit_instruction(encode_instruction(oc, mod_mem, 0xF, regB, regC, 0x4));
                     emit_jump_and_literal(0);
-                    relocation_t reloc{};
-                    reloc.section_name = m_current_section;
-                    reloc.symbol_name = op.symbol;
-                    reloc.type = reloaction_type::R_32;
-                    reloc.addend = 0;
-                    reloc.offset = current_offset() - 4;
-                    current_section().relocations.push_back(reloc);
+                    backpatch_t bp{};
+                    bp.section_name = m_current_section;
+                    bp.symbol_name = op.symbol;
+                    bp.offset = current_offset() - 4;
+                    bp.type = backpatch_type::RELOC;
+                    m_backpatch_table.push_back(bp);
                 }
             }
             else {

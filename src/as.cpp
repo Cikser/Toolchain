@@ -4,9 +4,11 @@
 as::assembler::assembler() {
     section_t section_undef{};
     section_undef.name = SECTION_UNDEF;
+    section_undef.idx = SECTION_UNDEF_IDX;
     m_section_table.insert({SECTION_UNDEF, section_undef});
     section_t section_abs{};
     section_abs.name = SECTION_ABS;
+    section_abs.idx = SECTION_ABS_IDX;
     m_section_table.insert({SECTION_ABS, section_abs});
 }
 
@@ -18,6 +20,7 @@ void as::assembler::define_label(const std::string& name) {
         }
         it->second.defined = true;
         it->second.section = current_section().name;
+        it->second.value = current_offset();
     }
     else {
         symbol_t sym{};
@@ -25,6 +28,7 @@ void as::assembler::define_label(const std::string& name) {
         sym.name = name;
         sym.section = current_section().name;
         sym.value = current_offset();
+        m_sym_table.insert({name, sym});
     }
 }
 
@@ -36,10 +40,10 @@ void as::assembler::emit_byte(uint8_t byte) {
 }
 
 void as::assembler::emit_word(uint32_t word) {
-    emit_byte(word & (0xFF << 0));
-    emit_byte(word & (0xFF << 8));
-    emit_byte(word & (0xFF << 16));
-    emit_byte(word & (0xFF << 24));
+    emit_byte((uint8_t)(word >> 0) & 0xFF);
+    emit_byte((uint8_t)(word >> 8) & 0xFF);
+    emit_byte((uint8_t)(word >> 16) & 0xFF);
+    emit_byte((uint8_t)(word >> 24) & 0xFF);
 }
 
 void as::assembler::emit_instruction(uint32_t instr) {
@@ -51,11 +55,14 @@ static constexpr uint32_t MODF_OFFSET = 0;
 static constexpr uint32_t REGA_OFFSET = 12;
 static constexpr uint32_t REGB_OFFSET = 8;
 static constexpr uint32_t REGC_OFFSET = 20;
+static constexpr uint32_t DISP_HI_OFFSET = 16;
+static constexpr uint32_t DISP_LO_OFFSET = 24;
 
 static constexpr uint32_t INSTR_MASK = 0xF;
 static constexpr uint32_t MODF_MASK = 0xF;
 static constexpr uint32_t REG_MASK = 0xF;
-static constexpr uint32_t DISP_MASK = 0xFFF;
+static constexpr uint32_t DISP_HI_MASK = 0xF00;
+static constexpr uint32_t DISP_LO_MASK = 0xFF;
 
 uint32_t as::assembler::encode_instruction(uint8_t oc, uint8_t mod, uint8_t regA,
                                         uint8_t regB, uint8_t regC, int16_t disp) {
@@ -65,7 +72,8 @@ uint32_t as::assembler::encode_instruction(uint8_t oc, uint8_t mod, uint8_t regA
         instr |= ((uint32_t)(regA & REG_MASK) << REGA_OFFSET);
         instr |= ((uint32_t)(regB & REG_MASK) << REGB_OFFSET);
         instr |= ((uint32_t)(regC & REG_MASK) << REGC_OFFSET);
-        instr |= ((uint32_t)(disp & DISP_MASK));
+        instr |= ((uint32_t)(disp & DISP_HI_MASK) << DISP_HI_OFFSET);
+        instr |= ((uint32_t)(disp & DISP_LO_MASK) << DISP_LO_OFFSET);
         return instr;
     }
 
@@ -119,7 +127,7 @@ void as::assembler::resolve_backpatch() {
                         relocation_t reloc{};
                         reloc.section_name = bp.section_name;
                         reloc.offset = bp.offset;
-                        reloc.type = reloaction_type::R_32;
+                        reloc.type = relocation_type::R_32;
                         if (sym.global) {
                             reloc.symbol_name = sym.name;
                             reloc.addend = 0;
@@ -128,14 +136,16 @@ void as::assembler::resolve_backpatch() {
                             reloc.symbol_name = sym.section;
                             reloc.addend = sym.value;
                         }
-                        section_t& section = m_section_table.find(sym.section)->second;
+                        section_t& section = m_section_table.find(bp.section_name)->second;
                         section.relocations.push_back(reloc);
-
                     }
+                    break;
                 }
-                default:
-                    throw std::runtime_error("Unable to complete backpatch");
+                default: {
+                    throw std::runtime_error("Unable to complete backpatch");    
+                }
             }
+            
             m_backpatch_table.erase(iterator);
             change = true;
             break;

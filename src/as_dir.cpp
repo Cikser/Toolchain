@@ -48,12 +48,14 @@ void as::assembler::dir_section(const std::string& section_name) {
         }
         section_t section{};
         section.name = section_name;
+        section.idx = m_sec_idx++;
         m_section_table.insert({section_name, section});
         m_current_section = section_name;
         symbol_t sym{};
         sym.name = section_name;
-        sym.section = SECTION_UNDEF;
+        sym.section = section_name;
         sym.defined = true;
+        m_sym_table.insert({section_name, sym});
     }
     else {
         m_current_section = it->second.name;
@@ -116,10 +118,11 @@ void as::assembler::dir_equ(const std::string& symbol_name, int32_t value) {
     else {
         symbol_t sym{};
         sym.name = symbol_name;
-        sym.section = SECTION_UNDEF;
+        sym.section = SECTION_ABS;
         sym.value = value;
         sym.absolute = true;
         sym.defined = true;
+        m_sym_table.insert({symbol_name, sym});
     }
 }
 
