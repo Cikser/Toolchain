@@ -48,7 +48,6 @@ namespace as {
         DEFAULT,
         BOUNDS,
         RELOC,
-        RELOC_PURE
     };
 
     struct backpatch_t {

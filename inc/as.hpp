@@ -83,6 +83,20 @@ namespace as {
 
         bool check_bounds(int32_t literal);
 
+        void change_instr_mod(std::vector<uint8_t>& data, uint32_t index, uint8_t value);
+        void change_instr_reg(std::vector<uint8_t>& data, uint32_t index, uint8_t value);
+        void change_instr_disp(std::vector<uint8_t>& data, uint32_t index, int16_t value);
+        void insert_jump_and_literal(std::vector<uint8_t>& data, uint32_t index, int32_t literal);
+        void update_symbols(const section_t& section, uint32_t offset);
+        void update_bp(const std::string& section, uint32_t offset);
+        void update_bp_vec(std::vector<backpatch_t>& bps, const std::string& section,  uint32_t offset);
+
+        void convert_to_pool(std::vector<uint8_t>& data, uint32_t index, int32_t literal);
+
+        void resolve_bounds_backpatch();
+        void resolve_reloc_backpatch();
+        void resolve_default_backpatch();
+        void resolve_symbols();
         void resolve_backpatch();
         void resolve_pequs();
 
