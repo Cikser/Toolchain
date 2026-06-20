@@ -30,6 +30,6 @@ int main(int argc, char* argv[]) {
     return 0;
 
 error:
-    std::cerr << "Usage: ./asembler [-o output_file] input_file\n";
+    std::cerr << "Usage: ./asembler [-o <output_file>] <input_file>\n";
     return 1;
 }

@@ -12,17 +12,21 @@ LEXER_C  = $(BUILD_DIR)/lexer.cpp
 PARSER_C = $(BUILD_DIR)/parser.cpp
 PARSER_H = $(BUILD_DIR)/parser.tab.h
 
-SRCS = $(wildcard $(SRC_DIR)/*.cpp)
+AS_SRCS = $(wildcard $(SRC_DIR)/as*.cpp)
+LD_SRCS = $(wildcard $(SRC_DIR)/ld*.cpp)
 
-OBJS = $(patsubst $(SRC_DIR)/%.cpp, $(BUILD_DIR)/%.o, $(SRCS)) \
+AS_OBJS = $(patsubst $(SRC_DIR)/as%.cpp, $(BUILD_DIR)/as%.o, $(AS_SRCS)) \
        $(BUILD_DIR)/lexer.o \
        $(BUILD_DIR)/parser.o
 
-TARGET = asembler
+LD_OBJS = $(patsubst $(SRC_DIR)/ld%.cpp, $(BUILD_DIR)/ld%.o, $(LD_SRCS))
+
+ASSEMBLER = asembler
+LINKER = linker
 
 .PHONY: all clean
 
-all: $(BUILD_DIR) $(TARGET)
+all: $(BUILD_DIR) $(ASSEMBLER) $(LINKER)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -39,8 +43,11 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
 $(BUILD_DIR)/%.o: $(BUILD_DIR)/%.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -I$(INC_DIR) -I$(BUILD_DIR) -c $< -o $@
 
-$(TARGET): $(OBJS)
+$(ASSEMBLER): $(AS_OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
+$(LINKER): $(LD_OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 clean:
-	rm -rf $(BUILD_DIR) asembler
+	rm -rf $(BUILD_DIR) $(ASSEMBLER) $(LINKER)

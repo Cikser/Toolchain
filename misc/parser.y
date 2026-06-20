@@ -1,5 +1,5 @@
 %{
-#include "as.hpp"
+#include "../inc/as.hpp"
 #include <cstdio>
 #include <cstring>
 #include <string>
