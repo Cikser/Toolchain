@@ -21,7 +21,6 @@ void as::assembler::assemble(const std::string& input_path, const std::string& o
     resolve_symbols();
     resolve_pequs();
     resolve_backpatch();
-    remove_section_symbols();
     write_elf(output_path + ".o");
     write_dump(output_path + ".txt");
 }
@@ -244,7 +243,7 @@ void as::assembler::write_elf(const std::string& output_path) {
 
     std::unordered_map<std::string, uint32_t> rela_shname;
     for (auto& sn : rela_secs) {
-        rela_shname[sn] = shstrtab.add(".rela." + sn);
+        rela_shname[sn] = shstrtab.add(".rela" + sn);
     }
 
     uint32_t ehdr_size = sizeof(Elf32_Ehdr);

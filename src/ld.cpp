@@ -34,7 +34,7 @@ void ld::linker::extract_sections_and_symbols(const std::string& input_path,
     file.read((char*)shstr_section.get(), shstr_hdr.sh_size);
     Elf32_Shdr symtab_hdr;
     Elf32_Shdr strtab_hdr;
-    std::vector<Elf32_Shdr> rela_shdrs;
+    std::vector<std::pair<Elf32_Shdr, std::string>> rela_shdrs;
     for (uint32_t i = 1; i < sh_num; i++) {
         Elf32_Shdr shdr;
         file.seekg(sh_off + i * sh_size);
@@ -50,13 +50,13 @@ void ld::linker::extract_sections_and_symbols(const std::string& input_path,
         if (shdr.sh_type == SHT_STRTAB) {
             continue;
         }
-        if (shdr.sh_type == SHT_RELA) {
-            rela_shdrs.push_back(shdr);
-            continue;
-        }
         section_t section{};
         char buf[256];
         strcpy(buf, (char*)shstr_section.get() + shdr.sh_name);
+        if (shdr.sh_type == SHT_RELA) {
+            rela_shdrs.push_back({shdr, buf});
+            continue;
+        }
         section.name = buf;
         file.seekg(shdr.sh_offset);
         section.data.reserve(shdr.sh_size);
@@ -82,5 +82,28 @@ void ld::linker::extract_sections_and_symbols(const std::string& input_path,
                 : (elf_sym.st_shndx == SHN_UNDEF ? SECTION_UNDEF 
                 : out_sections[elf_sym.st_shndx - 1].name);
         out_symbols.push_back(sym);
+    }
+    for (const auto& [rela_shdr, name] : rela_shdrs) {
+        std::string section_name = name.substr(5, name.length() - 5);
+        section_t* sec_ptr = nullptr;
+        for (auto& sec : out_sections) {
+            if (sec.name == section_name) {
+                sec_ptr = &sec;
+                break;
+            }
+        }
+        section_t& section = *sec_ptr;
+        for (uint32_t i = 0; i < rela_shdr.sh_size / rela_shdr.sh_entsize; i++) {
+            relocation_t rel{};
+            Elf32_Rela elf_rel;
+            file.seekg(rela_shdr.sh_offset + i * rela_shdr.sh_entsize);
+            file.read((char*)&elf_rel, sizeof(Elf32_Rela));
+            rel.section_name = section_name;
+            rel.type = relocation_type::R_32;
+            rel.offset = elf_rel.r_offset;
+            rel.symbol_name = out_symbols[ELF32_R_SYM(elf_rel.r_info) - 1].name;
+            rel.addend = elf_rel.r_addend;
+            section.relocations.push_back(rel);
+        }
     }
 }
