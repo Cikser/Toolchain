@@ -40,7 +40,7 @@ int main(int argc, char* argv[]) {
         char place[7];
         memcpy(place, argv[i], 6);
         place[6] = '\0';
-        if (strcmp(argv[i], "-place") == 0) {
+        if (strcmp(place, "-place") == 0) {
             ld::place_t place;
             char buf[256];
             int matched = sscanf(argv[i], "-place=%255[^@]@%x", buf, &place.address);

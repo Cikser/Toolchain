@@ -67,7 +67,7 @@ void ld::linker::extract_sections_and_symbols(const std::string& input_path,
         }
         section.name = buf;
         file.seekg(shdr.sh_offset);
-        section.data.reserve(shdr.sh_size);
+        section.data.resize(shdr.sh_size);
         file.read((char*)section.data.data(), shdr.sh_size);
         out_sections.push_back(section);
     }
@@ -84,7 +84,7 @@ void ld::linker::extract_sections_and_symbols(const std::string& input_path,
         sym.name = buf;
         sym.global = ELF32_ST_BIND(elf_sym.st_info);
         sym.absolute = elf_sym.st_shndx == SHN_ABS;
-        sym.defined = elf_sym.st_shndx == SHN_UNDEF;
+        sym.defined = elf_sym.st_shndx != SHN_UNDEF;
         sym.value = (int32_t)elf_sym.st_value;
         sym.section = elf_sym.st_shndx == SHN_ABS ? SECTION_ABS
                 : (elf_sym.st_shndx == SHN_UNDEF ? SECTION_UNDEF 
@@ -166,7 +166,7 @@ void ld::linker::merge_sections_and_symbols(std::vector<section_t>& sections, st
         present.data.reserve(present.data.size() + section.data.size());
         present.data.insert(present.data.end(), section.data.begin(), section.data.end());
         present.relocations.reserve(present.relocations.size() + section.relocations.size());
-        present.relocations.insert(present.relocations.end(), section.relocations.begin(), present.relocations.end());
+        present.relocations.insert(present.relocations.end(), section.relocations.begin(), section.relocations.end());
     }
     for (auto& sym : symbols) {
         if (!sym.global) {
