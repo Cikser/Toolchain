@@ -218,3 +218,67 @@ void ld::linker::merge_sections_and_symbols(std::vector<section_t>& sections, st
         } 
     }
 }
+
+void ld::linker::first_pass(const std::vector<std::string>& input_paths) {
+    for (const auto& path : input_paths) {
+        std::vector<symbol_t> symbols;
+        std::vector<section_t> sections;
+        extract_sections_and_symbols(path, sections, symbols);
+        merge_sections_and_symbols(sections, symbols);
+    }
+    map_sections();
+}
+
+void ld::linker::map_sections() {
+    uint32_t offset = 0;
+    for (auto& section : m_section_table) {
+        section.address = offset;
+        offset += section.data.size();
+        auto it = m_sym_table.find(section.name);
+        if (it != m_sym_table.end()) {
+            it->second.value = section.address;
+        }
+    }
+}
+
+bool ld::linker::try_local(section_t& section, relocation_t& rel) {
+    auto it = section.sym_table.find(rel.symbol_name);
+    if (it == section.sym_table.end() || !it->second.defined) {
+        return false;
+    }
+    uint32_t result = it->second.value + rel.addend;
+    section.data[rel.offset + 0] = (result >> 0) & 0xFF;
+    section.data[rel.offset + 1] = (result >> 8) & 0xFF;
+    section.data[rel.offset + 2] = (result >> 16) & 0xFF;
+    section.data[rel.offset + 3] = (result >> 24) & 0xFF;
+    return true;
+}
+
+bool ld::linker::try_global(section_t& section, relocation_t& rel) {
+    auto it = m_sym_table.find(rel.symbol_name);
+    if (it == m_sym_table.end() || !it->second.defined) {
+        return false;
+    }
+    uint32_t result = it->second.value + rel.addend;
+    section.data[rel.offset + 0] = (result >> 0) & 0xFF;
+    section.data[rel.offset + 1] = (result >> 8) & 0xFF;
+    section.data[rel.offset + 2] = (result >> 16) & 0xFF;
+    section.data[rel.offset + 3] = (result >> 24) & 0xFF;
+    return true;
+}
+
+void ld::linker::second_pass() {
+    for (auto& section : m_section_table) {
+        for (auto& rel : section.relocations) {
+            bool status = try_local(section, rel);
+            if (status) {
+                continue;
+            }
+            status = try_global(section, rel);
+            if (status) {
+                continue;
+            }
+            throw std::runtime_error("Symbol " + rel.symbol_name + " not defined");
+        }
+    }
+}
