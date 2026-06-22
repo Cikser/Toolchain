@@ -5,6 +5,7 @@
 #include <elf.h>
 #include <iostream>
 #include <memory>
+#include <set>
 
 ld::linker::linker() {
     section_t section_undef{};
@@ -127,7 +128,9 @@ uint32_t ld::linker::find_section(const std::string& name) {
 
 void ld::linker::merge_sections_and_symbols(std::vector<section_t>& sections, std::vector<symbol_t>& symbols) {
     std::unordered_map<std::string, uint32_t> offset_table;
+    std::set<std::string> section_set;
     for (auto& section : sections) {
+        section_set.insert(section.name);
         uint32_t idx = find_section(section.name);
         if (idx == -1) {
             continue;
@@ -166,6 +169,52 @@ void ld::linker::merge_sections_and_symbols(std::vector<section_t>& sections, st
         present.relocations.insert(present.relocations.end(), section.relocations.begin(), present.relocations.end());
     }
     for (auto& sym : symbols) {
-        // todo symbol insertion
+        if (!sym.global) {
+            auto it = m_sym_table.find(sym.name);
+            if (it != m_sym_table.end() && section_set.contains(sym.name)) {
+                continue;
+            }
+            else if (it == m_sym_table.end() && section_set.contains(sym.name)) {
+                sym.section_idx = find_section(sym.name);
+                m_sym_table.insert({sym.name, sym});
+                continue;
+            }
+            uint32_t idx = find_section(sym.section);
+            sym.section_idx = idx;
+            if (sym.section == SECTION_ABS) {
+                uint32_t idx = find_section(sections[0].name);
+            }
+            m_section_table[idx].sym_table.insert({sym.name, sym});
+        }
+        else {
+            auto it = m_sym_table.find(sym.name);
+            if (it == m_sym_table.end()) {
+                if (sym.section == SECTION_ABS) {
+                    sym.section_idx = SECTION_ABS_IDX;
+                }
+                else {
+                    sym.section_idx = find_section(sym.section);
+                }
+                m_sym_table.insert({sym.name, sym});
+            }
+            else {
+                symbol_t& present = it->second;
+                if (present.defined && sym.defined) {
+                    throw std::runtime_error("Symbol " + sym.name + " defined multiple times");
+                }
+                if (!present.defined && sym.defined) {
+                    present.defined = true;
+                    present.value = sym.value;
+                    present.absolute = sym.absolute;
+                    if (sym.section == SECTION_ABS) {
+                        present.section_idx = SECTION_ABS_IDX;
+                    }
+                    else {
+                        present.section_idx = find_section(sym.section);
+                    }
+                    present.section = sym.section;
+                }
+            }
+        } 
     }
 }

@@ -463,6 +463,7 @@ void as::assembler::resolve_pequs() {
             sym.value = result.value;
             sym.defined = true;
             sym.absolute = true;
+            sym.section = SECTION_ABS;
             change = true;
             m_pequ_table.erase(iterator);
             break;
