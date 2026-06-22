@@ -21,6 +21,7 @@ void as::assembler::assemble(const std::string& input_path, const std::string& o
     resolve_symbols();
     resolve_pequs();
     resolve_backpatch();
+    remove_section_symbols();
     write_elf(output_path + ".o");
     write_dump(output_path + ".txt");
 }

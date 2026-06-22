@@ -1,6 +1,7 @@
 #include "as.hpp"
 #include <stdexcept>
 #include <iostream>
+#include <algorithm>
 
 as::assembler::assembler() {
     section_t section_undef{};
@@ -162,6 +163,14 @@ void as::assembler::resolve_symbols() {
     }
 }
 
+void as::assembler::remove_section_symbols() {
+    for (const auto& [key, section] : m_section_table) {
+        if (m_sym_table.contains(key)) {
+            m_sym_table.erase(m_sym_table.find(key));
+        }
+    }
+}
+
 void as::assembler::update_symbols(const section_t& section, uint32_t offset) {
     for (auto& [key, sym] : m_sym_table) {
         if (sym.section != section.name) {
@@ -218,6 +227,9 @@ void as::assembler::resolve_bounds_backpatch() {
     for (auto iterator = m_backpatch_table.begin(); iterator != m_backpatch_table.end(); ++iterator) {
         if (iterator->type == backpatch_type::BOUNDS) {
             m_backpatch_table.erase(iterator);
+            if (iterator == m_backpatch_table.end()) {
+                break;
+            }
         }
     }
     while (change) {
@@ -322,8 +334,14 @@ void as::assembler::resolve_default_backpatch() {
     for (auto iterator = m_backpatch_table.begin(); iterator != m_backpatch_table.end(); ++iterator) {
         if (iterator->type == backpatch_type::DEFAULT) {
             m_backpatch_table.erase(iterator);
+            if (iterator == m_backpatch_table.end()) {
+                break;
+            }
         }
     }
+    std::sort(bps.begin(), bps.end(), [](const backpatch_t& bp1, const backpatch_t& bp2) {
+        return bp1.offset < bp2.offset;
+    });
     while (change) {
         change = false;
         for (auto iterator = bps.begin(); iterator != bps.end(); ++iterator) {

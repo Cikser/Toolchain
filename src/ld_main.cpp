@@ -19,18 +19,18 @@ int main(int argc, char* argv[]) {
             output_file = argv[i];
             continue;
         }
-        if (strcmp(argv[i], "-o")) {
+        if (strcmp(argv[i], "-o") == 0) {
             out = true;
             continue;
         }
-        if (strcmp(argv[i], "-hex")) {
+        if (strcmp(argv[i], "-hex") == 0) {
             if (type != ld::output_type::NULL_TYPE) {
                 goto error;
             }
             type = ld::output_type::HEX;
             continue;
         }
-        if (strcmp(argv[i], "-relocatable")) {
+        if (strcmp(argv[i], "-relocatable") == 0) {
             if (type != ld::output_type::NULL_TYPE) {
                 goto error;
             }
@@ -40,7 +40,7 @@ int main(int argc, char* argv[]) {
         char place[7];
         memcpy(place, argv[i], 6);
         place[6] = '\0';
-        if (strcmp(argv[i], "-place")) {
+        if (strcmp(argv[i], "-place") == 0) {
             ld::place_t place;
             char buf[256];
             int matched = sscanf(argv[i], "-place=%255[^@]@%x", buf, &place.address);

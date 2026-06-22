@@ -102,6 +102,8 @@ namespace as {
 
         eval_result_t try_eval_expr(std::shared_ptr<expr_node_t>& expr, bool final = false);
 
+        void remove_section_symbols();
+
         void write_elf(const std::string& path);
         void write_dump(const std::string& path);
     };
