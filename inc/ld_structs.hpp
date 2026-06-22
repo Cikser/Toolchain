@@ -33,10 +33,12 @@ namespace ld {
     struct symbol_t {
         std::string name;
         std::string section = SECTION_UNDEF;
+        uint32_t section_idx = 0;
         int32_t value = 0;
         bool absolute = false;
         bool global = false;
         bool defined = false;
+        bool is_extern = false;
     };
 
     enum class section_type { 

@@ -6,6 +6,13 @@
 #include <iostream>
 #include <memory>
 
+ld::linker::linker() {
+    section_t section_undef{};
+    section_undef.name = SECTION_UNDEF;
+    section_undef.idx = SECTION_UNDEF_IDX;
+    m_section_table.push_back(section_undef);
+}
+
 void ld::linker::extract_sections_and_symbols(const std::string& input_path, 
         std::vector<section_t>& out_sections, std::vector<symbol_t>& out_symbols) {
     std::ifstream file(input_path);
@@ -81,6 +88,7 @@ void ld::linker::extract_sections_and_symbols(const std::string& input_path,
         sym.section = elf_sym.st_shndx == SHN_ABS ? SECTION_ABS
                 : (elf_sym.st_shndx == SHN_UNDEF ? SECTION_UNDEF 
                 : out_sections[elf_sym.st_shndx - 1].name);
+        sym.is_extern = sym.global && !sym.defined;
         out_symbols.push_back(sym);
     }
     for (const auto& [rela_shdr, name] : rela_shdrs) {
@@ -105,5 +113,59 @@ void ld::linker::extract_sections_and_symbols(const std::string& input_path,
             rel.addend = elf_rel.r_addend;
             section.relocations.push_back(rel);
         }
+    }
+}
+
+uint32_t ld::linker::find_section(const std::string& name) {
+    for (uint32_t i = 0; i < m_section_table.size(); i++) {
+        if (name == m_section_table[i].name) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+void ld::linker::merge_sections_and_symbols(std::vector<section_t>& sections, std::vector<symbol_t>& symbols) {
+    std::unordered_map<std::string, uint32_t> offset_table;
+    for (auto& section : sections) {
+        uint32_t idx = find_section(section.name);
+        if (idx == -1) {
+            continue;
+        }
+        uint32_t offset = m_section_table[idx].data.size();
+        for (auto& sym : symbols) {
+            if (sym.section == section.name) {
+                sym.value += offset;
+            }
+        }
+        for (auto& reloc : section.relocations) {
+            reloc.offset += offset;
+        }
+        offset_table.insert({section.name, offset});
+    }
+    for (auto& section : sections) {
+        for (auto& rel : section.relocations) {
+            auto it = offset_table.find(rel.symbol_name);
+            if (it == offset_table.end()) {
+                continue;
+            }
+            rel.addend += it->second;
+        }
+    }
+    for (auto& section : sections) {
+        uint32_t idx = find_section(section.name);
+        if (idx == -1) {
+            section.idx = m_section_table.size();
+            m_section_table.push_back(section);
+            continue;
+        }
+        section_t& present = m_section_table[idx];
+        present.data.reserve(present.data.size() + section.data.size());
+        present.data.insert(present.data.end(), section.data.begin(), section.data.end());
+        present.relocations.reserve(present.relocations.size() + section.relocations.size());
+        present.relocations.insert(present.relocations.end(), section.relocations.begin(), present.relocations.end());
+    }
+    for (auto& sym : symbols) {
+        // todo symbol insertion
     }
 }

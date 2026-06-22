@@ -163,14 +163,6 @@ void as::assembler::resolve_symbols() {
     }
 }
 
-void as::assembler::remove_section_symbols() {
-    for (const auto& [key, section] : m_section_table) {
-        if (m_sym_table.contains(key)) {
-            m_sym_table.erase(m_sym_table.find(key));
-        }
-    }
-}
-
 void as::assembler::update_symbols(const section_t& section, uint32_t offset) {
     for (auto& [key, sym] : m_sym_table) {
         if (sym.section != section.name) {
