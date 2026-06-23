@@ -21,6 +21,9 @@ namespace ld {
         void first_pass(const std::vector<std::string>& input_paths, std::vector<place_t>& place_requests);
         void second_pass();
 
+        void second_pass_relocatable();
+        void second_pass_hex();
+
         bool try_local(section_t& section, relocation_t& rel);
         bool try_global(section_t& section, relocation_t& rel);
 

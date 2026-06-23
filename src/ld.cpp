@@ -291,6 +291,15 @@ bool ld::linker::try_global(section_t& section, relocation_t& rel) {
 }
 
 void ld::linker::second_pass() {
+    if (m_output_type == output_type::RELOCATABLE) {
+        second_pass_relocatable();
+    }
+    else {
+        second_pass_hex();
+    }
+}
+
+void ld::linker::second_pass_hex() {
     for (auto& section : m_section_table) {
         for (auto& rel : section.relocations) {
             bool status = try_local(section, rel);
@@ -301,8 +310,29 @@ void ld::linker::second_pass() {
             if (status) {
                 continue;
             }
-            if (m_output_type == output_type::HEX) {
-                throw std::runtime_error("Symbol " + rel.symbol_name + " not defined");
+            throw std::runtime_error("Symbol " + rel.symbol_name + " not defined");
+        }
+    }
+}
+
+void ld::linker::second_pass_relocatable() {
+    for (auto& section : m_section_table) {
+        bool change = true;
+        while (change) {
+            for (auto iterator = section.relocations.begin(); iterator != section.relocations.end(); ++iterator) {
+                relocation_t& rel = *iterator;
+                bool status = try_local(section, rel);
+                if (status) {
+                    change = true;
+                    section.relocations.erase(iterator);
+                    break;
+                }
+                status = try_global(section, rel);
+                if (status) {
+                    change = true;
+                    section.relocations.erase(iterator);
+                    break;
+                }
             }
         }
     }
