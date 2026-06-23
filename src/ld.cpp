@@ -74,7 +74,7 @@ void ld::linker::extract_sections_and_symbols(const std::string& input_path,
     auto strtab_section = std::make_unique<uint8_t[]>(strtab_hdr.sh_size);
     file.seekg(strtab_hdr.sh_offset);
     file.read((char*)strtab_section.get(), strtab_hdr.sh_size);
-    for (uint32_t i = 1; i < symtab_hdr.sh_size / symtab_hdr.sh_entsize - 1; i++) {
+    for (uint32_t i = 1; i < symtab_hdr.sh_size / symtab_hdr.sh_entsize; i++) {
         Elf32_Sym elf_sym;
         file.seekg(symtab_hdr.sh_offset + i * symtab_hdr.sh_entsize);
         file.read((char*)&elf_sym, sizeof(Elf32_Sym));
@@ -237,6 +237,11 @@ void ld::linker::map_sections() {
         auto it = m_sym_table.find(section.name);
         if (it != m_sym_table.end()) {
             it->second.value = section.address;
+        }
+        for (auto& [key, sym] : m_sym_table) {
+            if (sym.section_idx == section.idx && sym.name != section.name) {
+                sym.value += offset;
+            }
         }
     }
 }

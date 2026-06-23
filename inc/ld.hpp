@@ -31,8 +31,8 @@ namespace ld {
         uint32_t find_section(const std::string& name);
 
         void write_elf_relocatable(const std::string& path) {};
-        void write_elf_executable(const std::string& path) {};
-        void write_dump(const std::string& path) {};
+        void write_elf_executable(const std::string& path);
+        void write_dump(const std::string& path);
     };
 }
 

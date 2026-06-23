@@ -103,13 +103,14 @@ void as::assembler::change_instr_disp(std::vector<uint8_t>& data, uint32_t index
 }
 
 void as::assembler::insert_jump_and_literal(std::vector<uint8_t>& data, uint32_t index, int32_t literal) {
+    data.reserve(data.size() + 8);
     auto iterator = data.begin();
     iterator += index + 4;
     uint32_t instr = encode_instruction(0x3, 0x0, 0xF, 0x0, 0x0, 0x4);
-    data.insert(iterator + 0, (instr & 0xFF000000) >> 24);
-    data.insert(iterator + 1, (instr & 0x00FF0000) >> 16);
-    data.insert(iterator + 2, (instr & 0x0000FF00) >> 8);
-    data.insert(iterator + 3, (instr & 0x000000FF) >> 0);
+    data.insert(iterator + 0, (instr >> 24) & 0xFF);
+    data.insert(iterator + 1, (instr >> 16) & 0xFF);
+    data.insert(iterator + 2, (instr >> 8) & 0xFF);
+    data.insert(iterator + 3, (instr >> 0) & 0xFF);
     data.insert(iterator + 4, (literal >> 0) & 0xFF);
     data.insert(iterator + 5, (literal >> 8) & 0xFF);
     data.insert(iterator + 6, (literal >> 16) & 0xFF);

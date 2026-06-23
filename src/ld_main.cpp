@@ -5,7 +5,7 @@
 #include "ld.hpp"
 
 int main(int argc, char* argv[]) {
-    std::string output_file = "out";
+    std::string output_file = "program";
     ld::output_type type = ld::output_type::NULL_TYPE;
     std::vector<ld::place_t> place_requests;
     std::vector<std::string> input_paths;
