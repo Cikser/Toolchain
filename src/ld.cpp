@@ -219,19 +219,37 @@ void ld::linker::merge_sections_and_symbols(std::vector<section_t>& sections, st
     }
 }
 
-void ld::linker::first_pass(const std::vector<std::string>& input_paths) {
+void ld::linker::first_pass(const std::vector<std::string>& input_paths, std::vector<place_t>& place_requests) {
     for (const auto& path : input_paths) {
         std::vector<symbol_t> symbols;
         std::vector<section_t> sections;
         extract_sections_and_symbols(path, sections, symbols);
         merge_sections_and_symbols(sections, symbols);
     }
-    map_sections();
+    if (m_output_type == output_type::HEX) { 
+        map_sections(place_requests);
+    }
 }
 
-void ld::linker::map_sections() {
+void ld::linker::map_sections(std::vector<place_t>& place_requests) {
     uint32_t offset = 0;
     for (auto& section : m_section_table) {
+        uint32_t address = (uint32_t)-1;
+        auto place_it = place_requests.end();
+        for (auto iterator = place_requests.begin(); iterator != place_requests.end(); ++iterator) {
+            if (iterator->section_name == section.name) {
+                address = iterator->address;
+                place_it = iterator;
+                break;
+            }
+        }
+        if (address != (uint32_t)-1) {
+            place_requests.erase(place_it);
+            if (address < offset) {
+                throw std::runtime_error("Section " + section.name + " can not be placed at address " + std::to_string(address));
+            }
+            offset = address;
+        }
         section.address = offset;
         offset += section.data.size();
         auto it = m_sym_table.find(section.name);
@@ -283,7 +301,9 @@ void ld::linker::second_pass() {
             if (status) {
                 continue;
             }
-            throw std::runtime_error("Symbol " + rel.symbol_name + " not defined");
+            if (m_output_type == output_type::HEX) {
+                throw std::runtime_error("Symbol " + rel.symbol_name + " not defined");
+            }
         }
     }
 }

@@ -9,10 +9,11 @@
 
 void ld::linker::link(const std::vector<std::string>& input_paths, const std::string& output_path,
                     ld::output_type type, std::vector<place_t>& place_requests) {
-    first_pass(input_paths);
+    m_output_type = type;
+    first_pass(input_paths, place_requests);
     second_pass();
     write_dump(output_path + ".txt");
-    write_elf_executable(output_path + ".hex");
+    write_elf(output_path + (m_output_type == output_type::HEX ? ".hex" : ".o"));
 }
 
 void ld::linker::write_dump(const std::string& path) {
@@ -103,7 +104,7 @@ namespace ld {
     };
 }
 
-void ld::linker::write_elf_executable(const std::string& path) {
+void ld::linker::write_elf(const std::string& path) {
     strtab_builder strtab;
     strtab_builder shstrtab;
     std::vector<sym_entry_t> locals, globals;
