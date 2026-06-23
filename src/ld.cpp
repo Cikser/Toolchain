@@ -319,6 +319,7 @@ void ld::linker::second_pass_relocatable() {
     for (auto& section : m_section_table) {
         bool change = true;
         while (change) {
+            change = false;
             for (auto iterator = section.relocations.begin(); iterator != section.relocations.end(); ++iterator) {
                 relocation_t& rel = *iterator;
                 bool status = try_local(section, rel);

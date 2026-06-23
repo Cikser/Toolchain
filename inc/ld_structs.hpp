@@ -42,19 +42,10 @@ namespace ld {
         bool is_extern = false;
     };
 
-    enum class section_type { 
-        NOTYPE,
-        PROGBITS, 
-        STRTAB,
-        SYMTAB,
-        RELA
-    };
-
     struct section_t {
         std::string name;
         uint32_t idx = 0;
         uint32_t address = 0;
-        section_type type = section_type::NOTYPE;
         std::vector<uint8_t> data;
         std::vector<relocation_t> relocations;
         std::unordered_map<std::string, symbol_t> sym_table;
