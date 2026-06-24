@@ -113,6 +113,12 @@ void as::assembler::emit_jump_and_literal(int32_t literal) {
 }
 
 void as::assembler::emit_pool_ld(int32_t reg, int32_t literal) {
+    emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, 0xF, 0x0, 0x8));
+    emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, (uint8_t)reg, 0x0, 0x0));
+    emit_jump_and_literal(literal);
+}
+
+void as::assembler::emit_short_pool_ld(int32_t reg, int32_t literal) {
     emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, 0xF, 0x0, 0x4));
     emit_jump_and_literal(literal);
 }
@@ -132,7 +138,7 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                 emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0x0, 0x0, op.literal));
             }
             else {
-                emit_pool_ld(reg, op.literal);
+                emit_short_pool_ld(reg, op.literal);
             }
             break;
         }
@@ -143,10 +149,10 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                     emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0x0, 0x0, (int16_t)it->second.value));
                 }
                 else if (it->second.absolute && it->second.defined) {
-                    emit_pool_ld(reg, it->second.value);
+                    emit_short_pool_ld(reg, it->second.value);
                 }
                 else if (!it->second.defined) {
-                    emit_pool_ld(reg, 0);
+                    emit_short_pool_ld(reg, 0);
                     backpatch_t bp{};
                     bp.section_name = m_current_section;
                     bp.symbol_name = it->second.name;
@@ -155,7 +161,7 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                     m_backpatch_table.push_back(bp);
                 }
                 else {
-                    emit_pool_ld(reg, 0);
+                    emit_short_pool_ld(reg, 0);
                     backpatch_t bp{};
                     bp.section_name = m_current_section;
                     bp.symbol_name = op.symbol;
@@ -169,11 +175,10 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                 sym.name = op.symbol;
                 sym.section = SECTION_UNDEF;
                 m_sym_table.insert({op.symbol, sym});
-                emit_pool_ld(reg, 0);
+                emit_short_pool_ld(reg, 0);
                 backpatch_t bp{};
                 bp.symbol_name = op.symbol;
                 bp.section_name = m_current_section;
-                bp.type = backpatch_type::RELOC;
                 bp.offset = current_offset() - 4;
                 m_backpatch_table.push_back(bp);
             }

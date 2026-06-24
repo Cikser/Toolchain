@@ -102,10 +102,19 @@ void as::assembler::change_instr_disp(std::vector<uint8_t>& data, uint32_t index
     data[index + 3] = value & 0xFF;
 }
 
-void as::assembler::insert_jump_and_literal(std::vector<uint8_t>& data, uint32_t index, int32_t literal) {
-    data.reserve(data.size() + 8);
+void as::assembler::insert_jump_and_literal(std::vector<uint8_t>& data, uint32_t index, int32_t literal, uint32_t addend) {
+    data.reserve(data.size() + 12);
     auto iterator = data.begin();
     iterator += index + 4;
+    if (addend == 12) {
+        uint8_t reg = data[index + 1] >> 4;
+        uint32_t instr = encode_instruction(0x9, 0x2, reg, reg, 0x0, 0x0);
+        data.insert(iterator + 0, (instr >> 0) & 0xFF);
+        data.insert(iterator + 1, (instr >> 8) & 0xFF);
+        data.insert(iterator + 2, (instr >> 16) & 0xFF);
+        data.insert(iterator + 3, (instr >> 24) & 0xFF);
+        iterator += 4;
+    }
     uint32_t instr = encode_instruction(0x3, 0x0, 0xF, 0x0, 0x0, 0x4);
     data.insert(iterator + 0, (instr >> 0) & 0xFF);
     data.insert(iterator + 1, (instr >> 8) & 0xFF);
@@ -117,7 +126,7 @@ void as::assembler::insert_jump_and_literal(std::vector<uint8_t>& data, uint32_t
     data.insert(iterator + 7, (literal >> 24) & 0xFF);
 }
 
-void as::assembler::convert_to_pool(std::vector<uint8_t>& data, uint32_t index, int32_t literal) {
+void as::assembler::convert_to_pool(std::vector<uint8_t>& data, uint32_t index, int32_t literal, uint32_t addend) {
     uint8_t mod = 0;
     uint8_t oc = (data[index + 0] & 0xF0) >> 4;
     switch (oc) {
@@ -139,8 +148,9 @@ void as::assembler::convert_to_pool(std::vector<uint8_t>& data, uint32_t index, 
     }
     change_instr_mod(data, index, mod);
     change_instr_reg(data, index, 0xF);
-    change_instr_disp(data, index, 0x4);
-    insert_jump_and_literal(data, index, literal);
+    uint32_t disp = addend == 12 ? 8 : 4;
+    change_instr_disp(data, index, disp);
+    insert_jump_and_literal(data, index, literal, addend);
 }
 
 uint32_t as::assembler::current_offset() {
@@ -164,7 +174,7 @@ void as::assembler::resolve_symbols() {
     }
 }
 
-void as::assembler::update_symbols(const section_t& section, uint32_t offset) {
+void as::assembler::update_symbols(const section_t& section, uint32_t offset, uint32_t addend) {
     for (auto& [key, sym] : m_sym_table) {
         if (sym.section != section.name) {
             continue;
@@ -172,11 +182,11 @@ void as::assembler::update_symbols(const section_t& section, uint32_t offset) {
         if (sym.value <= offset) {
             continue;
         }
-        sym.value += 8;
+        sym.value += addend;
     }
 }
 
-void as::assembler::update_bp(const std::string& section, uint32_t offset) {
+void as::assembler::update_bp(const std::string& section, uint32_t offset, uint32_t addend) {
     for (auto& bp : m_backpatch_table) {
         if (bp.type != backpatch_type::BOUNDS) {
             continue;
@@ -187,11 +197,11 @@ void as::assembler::update_bp(const std::string& section, uint32_t offset) {
         if (bp.offset <= offset) {
             continue;
         }
-        bp.offset += 8;
+        bp.offset += addend;
     }
 }
 
-void as::assembler::update_bp_vec(std::vector<backpatch_t>& bps, const std::string& section, uint32_t offset) {
+void as::assembler::update_bp_vec(std::vector<backpatch_t>& bps, const std::string& section, uint32_t offset, uint32_t addend) {
     for (auto& bp : bps) {
         if (bp.type != backpatch_type::DEFAULT) {
             continue;
@@ -202,14 +212,14 @@ void as::assembler::update_bp_vec(std::vector<backpatch_t>& bps, const std::stri
         if (bp.offset <= offset) {
             continue;
         }
-        bp.offset += 8;
+        bp.offset += addend;
     }
 }
 
-void as::assembler::update_fault(section_t& section, uint32_t offset) {
+void as::assembler::update_fault(section_t& section, uint32_t offset, uint32_t addend) {
     for (auto& [sym_name, idx] : section.possible_bp) {
         if (idx > offset) {
-            idx += 8;
+            idx += addend;
         }
     }
     for (auto& [sym_name, idx] : section.possible_bp) {
@@ -232,10 +242,10 @@ void as::assembler::update_fault(section_t& section, uint32_t offset) {
         }
         int16_t lit = (int16_t)disp;
         if (lit > 0) {
-            lit += 8;
+            lit += addend;
         }
         else if (lit < 0) {
-            lit -= 8;
+            lit -= addend;
         }
         disp = lit;
         section.data[idx + 3] = disp & 0xFF;
@@ -244,10 +254,10 @@ void as::assembler::update_fault(section_t& section, uint32_t offset) {
     }
 }
 
-void as::assembler::update_reloc(section_t& section, uint32_t offset) {
+void as::assembler::update_reloc(section_t& section, uint32_t offset, uint32_t addend) {
     for (auto& rel : section.relocations) {
         if (rel.offset > offset) {
-            rel.offset += 8;
+            rel.offset += addend;
         }
     }
 }
@@ -402,15 +412,16 @@ void as::assembler::resolve_default_backpatch() {
                 section.possible_bp.push_back({bp.symbol_name, bp.offset});
             }
             else {
-                convert_to_pool(section.data, bp.offset, sym.value);
-                update_symbols(section, bp.offset);
-                update_fault(section, bp.offset);
-                update_bp(section.name, bp.offset);
-                update_bp_vec(bps, section.name, bp.offset);
-                update_reloc(section, bp.offset);
+                uint32_t addend = get_addend(section.data, bp.offset);
+                convert_to_pool(section.data, bp.offset, sym.value, addend);
+                update_symbols(section, bp.offset, addend);
+                update_fault(section, bp.offset, addend);
+                update_bp(section.name, bp.offset, addend);
+                update_bp_vec(bps, section.name, bp.offset, addend);
+                update_reloc(section, bp.offset, addend);
                 if (!sym.absolute) {
                     backpatch_t bp_rel{};
-                    bp_rel.offset = bp.offset + 8;
+                    bp_rel.offset = bp.offset + addend;
                     bp_rel.section_name = bp.section_name;
                     bp_rel.symbol_name = bp.symbol_name;
                     bp_rel.type = backpatch_type::RELOC;
@@ -425,6 +436,14 @@ void as::assembler::resolve_default_backpatch() {
     if (!bps.empty()) {
         throw std::runtime_error("Unable to complete backpatch");
     }
+}
+
+uint32_t as::assembler::get_addend(std::vector<uint8_t>& data, uint32_t offset) {
+    uint8_t oc = (data[offset + 0] & 0xF0) >> 4;
+    if (oc == 0x9) {
+        return 12;
+    }
+    return 8;
 }
 
 void as::assembler::resolve_backpatch() {
