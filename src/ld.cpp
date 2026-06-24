@@ -182,7 +182,7 @@ void ld::linker::merge_sections_and_symbols(std::vector<section_t>& sections, st
             uint32_t idx = find_section(sym.section);
             sym.section_idx = idx;
             if (sym.section == SECTION_ABS) {
-                uint32_t idx = find_section(sections[0].name);
+                idx = find_section(sections[0].name);
             }
             m_section_table[idx].sym_table.insert({sym.name, sym});
         }
@@ -258,7 +258,7 @@ void ld::linker::map_sections(std::vector<place_t>& place_requests) {
         }
         for (auto& [key, sym] : m_sym_table) {
             if (sym.section_idx == section.idx && sym.name != section.name) {
-                sym.value += offset;
+                sym.value += section.address;
             }
         }
     }

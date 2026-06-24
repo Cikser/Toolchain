@@ -63,7 +63,7 @@ static constexpr uint32_t DISP_LO_OFFSET = 24;
 static constexpr uint32_t INSTR_MASK = 0xF;
 static constexpr uint32_t MODF_MASK = 0xF;
 static constexpr uint32_t REG_MASK = 0xF;
-static constexpr uint32_t DISP_HI_MASK = 0xF00;
+static constexpr uint32_t DISP_HI_MASK = 0xF;
 static constexpr uint32_t DISP_LO_MASK = 0xFF;
 
 uint32_t as::assembler::encode_instruction(uint8_t oc, uint8_t mod, uint8_t regA,
@@ -74,7 +74,7 @@ uint32_t as::assembler::encode_instruction(uint8_t oc, uint8_t mod, uint8_t regA
         instr |= ((uint32_t)(regA & REG_MASK) << REGA_OFFSET);
         instr |= ((uint32_t)(regB & REG_MASK) << REGB_OFFSET);
         instr |= ((uint32_t)(regC & REG_MASK) << REGC_OFFSET);
-        instr |= ((uint32_t)(disp & DISP_HI_MASK) << DISP_HI_OFFSET);
+        instr |= ((uint32_t)((disp >> 8) & DISP_HI_MASK) << DISP_HI_OFFSET);
         instr |= ((uint32_t)(disp & DISP_LO_MASK) << DISP_LO_OFFSET);
         return instr;
 }
@@ -107,10 +107,10 @@ void as::assembler::insert_jump_and_literal(std::vector<uint8_t>& data, uint32_t
     auto iterator = data.begin();
     iterator += index + 4;
     uint32_t instr = encode_instruction(0x3, 0x0, 0xF, 0x0, 0x0, 0x4);
-    data.insert(iterator + 0, (instr >> 24) & 0xFF);
-    data.insert(iterator + 1, (instr >> 16) & 0xFF);
-    data.insert(iterator + 2, (instr >> 8) & 0xFF);
-    data.insert(iterator + 3, (instr >> 0) & 0xFF);
+    data.insert(iterator + 0, (instr >> 0) & 0xFF);
+    data.insert(iterator + 1, (instr >> 8) & 0xFF);
+    data.insert(iterator + 2, (instr >> 16) & 0xFF);
+    data.insert(iterator + 3, (instr >> 24) & 0xFF);
     data.insert(iterator + 4, (literal >> 0) & 0xFF);
     data.insert(iterator + 5, (literal >> 8) & 0xFF);
     data.insert(iterator + 6, (literal >> 16) & 0xFF);
@@ -193,7 +193,7 @@ void as::assembler::update_bp(const std::string& section, uint32_t offset) {
 
 void as::assembler::update_bp_vec(std::vector<backpatch_t>& bps, const std::string& section, uint32_t offset) {
     for (auto& bp : bps) {
-        if (bp.type != backpatch_type::BOUNDS) {
+        if (bp.type != backpatch_type::DEFAULT) {
             continue;
         }
         if (bp.section_name != section) {
@@ -203,6 +203,52 @@ void as::assembler::update_bp_vec(std::vector<backpatch_t>& bps, const std::stri
             continue;
         }
         bp.offset += 8;
+    }
+}
+
+void as::assembler::update_fault(section_t& section, uint32_t offset) {
+    for (auto& [sym_name, idx] : section.possible_bp) {
+        if (idx > offset) {
+            idx += 8;
+        }
+    }
+    for (auto& [sym_name, idx] : section.possible_bp) {
+        auto it = m_sym_table.find(sym_name);
+        if (it == m_sym_table.end()) {
+            continue;
+        }
+        symbol_t& sym = it->second;
+        if (sym.value > offset && idx > offset) {
+            continue;
+        }
+        if (idx <= offset && sym.value <= offset) {
+            continue;
+        }
+        uint16_t disp = 0;
+        disp |= section.data[idx + 3];
+        disp |= (section.data[idx + 2] & 0xF) << 8;
+        if (disp & 0x800) {
+            disp |= 0xF000;
+        }
+        int16_t lit = (int16_t)disp;
+        if (lit > 0) {
+            lit += 8;
+        }
+        else if (lit < 0) {
+            lit -= 8;
+        }
+        disp = lit;
+        section.data[idx + 3] = disp & 0xFF;
+        section.data[idx + 2] &= 0xF0;
+        section.data[idx + 2] |= (disp >> 8) & 0xF;
+    }
+}
+
+void as::assembler::update_reloc(section_t& section, uint32_t offset) {
+    for (auto& rel : section.relocations) {
+        if (rel.offset > offset) {
+            rel.offset += 8;
+        }
     }
 }
 
@@ -345,15 +391,23 @@ void as::assembler::resolve_default_backpatch() {
             }
             symbol_t& sym = it->second;
             section_t& section = m_section_table.at(bp.section_name);
-            if ((sym.absolute && check_bounds(sym.value)) || (sym.section == bp.section_name && check_bounds(sym.value - bp.offset - 4))) {
+            if (sym.absolute && check_bounds(sym.value)) {
                 section.data[bp.offset + 2] = (section.data[bp.offset + 2] & 0xF0) | (sym.value & (0xF << 8));
                 section.data[bp.offset + 3] = sym.value & 0xFF;
+            }
+            else if (sym.section == bp.section_name && check_bounds(sym.value - bp.offset - 4)) {
+                uint32_t value = sym.value - bp.offset - 4;
+                section.data[bp.offset + 2] = (section.data[bp.offset + 2] & 0xF0) | (value & (0xF << 8));
+                section.data[bp.offset + 3] = value & 0xFF;
+                section.possible_bp.push_back({bp.symbol_name, bp.offset});
             }
             else {
                 convert_to_pool(section.data, bp.offset, sym.value);
                 update_symbols(section, bp.offset);
+                update_fault(section, bp.offset);
                 update_bp(section.name, bp.offset);
                 update_bp_vec(bps, section.name, bp.offset);
+                update_reloc(section, bp.offset);
                 if (!sym.absolute) {
                     backpatch_t bp_rel{};
                     bp_rel.offset = bp.offset + 8;

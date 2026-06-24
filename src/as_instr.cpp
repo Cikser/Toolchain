@@ -139,10 +139,10 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
         case operand_type::SYMBOL_IMM: {
             auto it = m_sym_table.find(op.symbol);
             if (it != m_sym_table.end()) {
-                if (it->second.absolute && check_bounds(it->second.value)) {
+                if (it->second.absolute && it->second.defined && check_bounds(it->second.value)) {
                     emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0x0, 0x0, (int16_t)it->second.value));
                 }
-                else if (it->second.absolute) {
+                else if (it->second.absolute && it->second.defined) {
                     emit_pool_ld(reg, it->second.value);
                 }
                 else if (!it->second.defined) {
@@ -417,6 +417,7 @@ void as::assembler::emit_jump_or_call(uint8_t oc, uint8_t mod_direct, uint8_t mo
                 }
                 else if (it->second.section == current_section().name) {
                     emit_instruction(encode_instruction(oc, mod_direct, 0xF, regB, regC, it->second.value - current_offset() - 4));
+                    current_section().possible_bp.push_back({it->second.name, current_offset() - 4});
                 }
                 else {
                     emit_instruction(encode_instruction(oc, mod_mem, 0xF, regB, regC, 0x4));

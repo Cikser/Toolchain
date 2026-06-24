@@ -90,6 +90,8 @@ namespace as {
         void update_symbols(const section_t& section, uint32_t offset);
         void update_bp(const std::string& section, uint32_t offset);
         void update_bp_vec(std::vector<backpatch_t>& bps, const std::string& section,  uint32_t offset);
+        void update_fault(section_t& section, uint32_t offset);
+        void update_reloc(section_t& section, uint32_t offset);
 
         void convert_to_pool(std::vector<uint8_t>& data, uint32_t index, int32_t literal);
 

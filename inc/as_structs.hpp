@@ -42,6 +42,7 @@ namespace as {
         uint32_t idx = 0;
         std::vector<uint8_t> data;
         std::vector<relocation_t> relocations;
+        std::vector<std::pair<std::string, uint32_t>> possible_bp;
     };
 
     enum class backpatch_type {

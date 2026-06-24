@@ -14,6 +14,7 @@ PARSER_H = $(BUILD_DIR)/parser.tab.h
 
 AS_SRCS = $(wildcard $(SRC_DIR)/as*.cpp)
 LD_SRCS = $(wildcard $(SRC_DIR)/ld*.cpp)
+EMU_SRCS = $(wildcard $(SRC_DIR)/emu*.cpp)
 
 AS_OBJS = $(patsubst $(SRC_DIR)/as%.cpp, $(BUILD_DIR)/as%.o, $(AS_SRCS)) \
        $(BUILD_DIR)/lexer.o \
@@ -21,12 +22,15 @@ AS_OBJS = $(patsubst $(SRC_DIR)/as%.cpp, $(BUILD_DIR)/as%.o, $(AS_SRCS)) \
 
 LD_OBJS = $(patsubst $(SRC_DIR)/ld%.cpp, $(BUILD_DIR)/ld%.o, $(LD_SRCS))
 
+EMU_OBJS = $(patsubst $(SRC_DIR)/emu%.cpp, $(BUILD_DIR)/emu%.o, $(EMU_SRCS))
+
 ASSEMBLER = asembler
 LINKER = linker
+EMULATOR = emulator
 
 .PHONY: all clean
 
-all: $(BUILD_DIR) $(ASSEMBLER) $(LINKER)
+all: $(BUILD_DIR) $(ASSEMBLER) $(LINKER) $(EMULATOR)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -49,5 +53,8 @@ $(ASSEMBLER): $(AS_OBJS)
 $(LINKER): $(LD_OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
+$(EMULATOR): $(EMU_OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
 clean:
-	rm -rf $(BUILD_DIR) $(ASSEMBLER) $(LINKER)
+	rm -rf $(BUILD_DIR) $(ASSEMBLER) $(LINKER) $(EMULATOR)

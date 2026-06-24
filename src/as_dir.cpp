@@ -102,7 +102,6 @@ void as::assembler::dir_ascii(const std::string& string) {
     for (const auto& ch : string) {
         emit_byte((uint8_t)ch);
     }
-    emit_byte((uint8_t)'\0');
 }
 
 void as::assembler::dir_equ(const std::string& symbol_name, std::shared_ptr<expr_node_t> expr) {
@@ -116,6 +115,7 @@ void as::assembler::dir_equ(const std::string& symbol_name, std::shared_ptr<expr
             it->second.absolute = true;
             it->second.defined = true;
             it->second.value = result.value;
+            it->second.section = SECTION_ABS;
         }
         else {
             symbol_t sym{};
