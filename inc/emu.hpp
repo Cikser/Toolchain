@@ -50,6 +50,10 @@ namespace emu {
         std::unordered_map<uint32_t, mem_block_t> m_memory;
         bool m_running = false;
 
+        bool m_timer_ip = false;
+        bool m_term_ip = false;
+        bool m_fault_ip = false;
+
         void load_memory(const std::string& path);
         void setup();
         void run();

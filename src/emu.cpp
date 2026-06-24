@@ -128,7 +128,8 @@ void emu::emulator::execute_instruction() {
                     break;
                 }
                 default: {
-                    throw std::runtime_error("Unknown mod");
+                    m_fault_ip = true;
+                    break;
                 }
             }
             break;
@@ -180,7 +181,8 @@ void emu::emulator::execute_instruction() {
                     break;
                 }
                 default: {
-                    throw std::runtime_error("Unknown mod");
+                    m_fault_ip = true;
+                    break;
                 }
             }
             break;
@@ -210,7 +212,8 @@ void emu::emulator::execute_instruction() {
                     break;
                 }
                 default: {
-                    throw std::runtime_error("Unknown mod");
+                    m_fault_ip = true;
+                    break;
                 }
             }
             break;
@@ -234,7 +237,8 @@ void emu::emulator::execute_instruction() {
                     break;
                 }
                 default: {
-                    throw std::runtime_error("Unknown mod");
+                    m_fault_ip = true;
+                    break;
                 }
             }
             break;
@@ -250,7 +254,8 @@ void emu::emulator::execute_instruction() {
                     break;
                 }
                 default: {
-                    throw std::runtime_error("Unknown mod");
+                    m_fault_ip = true;
+                    break;
                 }
             }
             break;
@@ -271,7 +276,8 @@ void emu::emulator::execute_instruction() {
                     break;
                 }
                 default: {
-                    throw std::runtime_error("Unknown mod");
+                    m_fault_ip = true;
+                    break;
                 }
             }
             break;
@@ -313,14 +319,44 @@ void emu::emulator::execute_instruction() {
                     break;
                 }
                 default: {
-                    throw std::runtime_error("Unknown mod");
+                    m_fault_ip = true;
+                    break;
                 }
             }
             break;
         }
         default: {
-            throw std::runtime_error("Unknown oc");
+            m_fault_ip = true;
+            break;
         }
     }
     handle_interrupt();
+}
+
+void emu::emulator::handle_interrupt() {
+    if (!m_fault_ip && !m_timer_ip && !m_term_ip) {
+        return;
+    }
+    uint32_t& cause = m_control_reg_file.at(CSR_CAUSE);
+    uint32_t& status = m_control_reg_file.at(CSR_STATUS);
+    uint32_t& handler = m_control_reg_file.at(CSR_HANDLER);
+    uint32_t& pc = m_reg_file.at(0xF);
+    uint32_t& sp = m_reg_file.at(0xE);
+    if (m_fault_ip) {
+        m_fault_ip = false;
+        cause = 1;
+    }
+    else if (m_term_ip & !(status & 0x1)) {
+        m_term_ip = false;
+        cause = 3;
+    }
+    else if (m_timer_ip & !(status & 0x1)) {
+        m_timer_ip = false;
+        cause = 2;
+    }
+    sp -= 4;
+    write_word(sp, status);
+    write_word(sp, pc);
+    status = status & (~0x1);
+    pc = handler;
 }
