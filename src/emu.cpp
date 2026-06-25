@@ -111,7 +111,7 @@ uint8_t emu::emulator::read_byte(uint32_t addr) {
     auto it = m_memory.find(addr & MEM_BLOCK_MASK);
     if (it == m_memory.end()) {
         term_exit();
-        throw std::runtime_error("Page fault");
+        throw std::runtime_error(std::format("Page fault at address 0x{:08x}", addr));
     }
     return it->second.at(addr & ~MEM_BLOCK_MASK);
 }
@@ -157,7 +157,7 @@ emu::instruction emu::emulator::read_instruction(uint32_t addr) {
 uint32_t emu::emulator::read_mmio(uint32_t addr) {
     if (addr != MMIO_TERM_IN) {
         term_exit();
-        throw std::runtime_error("Page fault");
+        throw std::runtime_error(std::format("Page fault at address 0x{:08x}", addr));
     }
     return m_term_buffer;
 }
@@ -165,7 +165,7 @@ uint32_t emu::emulator::read_mmio(uint32_t addr) {
 void emu::emulator::write_mmio(uint32_t addr, uint32_t value) {
     if (addr != MMIO_TERM_OUT && addr != MMIO_TIMER_CFG) {
         term_exit();
-        throw std::runtime_error("Page fault");
+        throw std::runtime_error(std::format("Page fault at address 0x{:08x}", addr));
     }
     if (addr == MMIO_TERM_OUT) {
         write(STDOUT_FILENO, &value, 1);
@@ -191,7 +191,7 @@ void emu::emulator::execute_instruction() {
             break;
         }
         case 0x1: {
-            sp -= 4;
+            sp -= 8;
             uint32_t& cause = m_control_reg_file.at(CSR_CAUSE);
             uint32_t& status = m_control_reg_file.at(CSR_STATUS);
             uint32_t& handler = m_control_reg_file.at(CSR_HANDLER);

@@ -188,9 +188,6 @@ void as::assembler::update_symbols(const section_t& section, uint32_t offset, ui
 
 void as::assembler::update_bp(const std::string& section, uint32_t offset, uint32_t addend) {
     for (auto& bp : m_backpatch_table) {
-        if (bp.type != backpatch_type::BOUNDS) {
-            continue;
-        }
         if (bp.section_name != section) {
             continue;
         }
