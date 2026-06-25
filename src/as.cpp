@@ -405,7 +405,8 @@ void as::assembler::resolve_default_backpatch() {
                 section.data[bp.offset + 2] = (section.data[bp.offset + 2] & 0xF0) | (sym.value & (0xF << 8));
                 section.data[bp.offset + 3] = sym.value & 0xFF;
             }
-            else if (sym.section == bp.section_name && check_bounds(sym.value - bp.offset - 4)) {
+            else if (sym.section == bp.section_name && check_bounds(sym.value - bp.offset - 4)
+                && !sym_imm(section.data, bp.offset)) {
                 uint32_t value = sym.value - bp.offset - 4;
                 section.data[bp.offset + 2] = (section.data[bp.offset + 2] & 0xF0) | (value & (0xF << 8));
                 section.data[bp.offset + 3] = value & 0xFF;
@@ -447,10 +448,24 @@ uint32_t as::assembler::get_addend(std::vector<uint8_t>& data, uint32_t offset) 
     return 8;
 }
 
+bool as::assembler::sym_imm(std::vector<uint8_t>& data, uint32_t offset) {
+    uint8_t oc = (data[offset + 0] & 0xF0) >> 4;
+    uint8_t mod = data[offset + 0] & 0xF;
+    if (oc == 0x9 && mod == 0x1) {
+        return true;
+    }
+    return false;
+}
+
 void as::assembler::resolve_backpatch() {
     resolve_default_backpatch();
     resolve_bounds_backpatch();
     resolve_reloc_backpatch();
+    for (auto& [key, section] : m_section_table) {
+        while (section.data.size() % 4 != 0) {
+            section.data.push_back(0);
+        }
+    }
 }
 
 as::eval_result_t as::assembler::try_eval_expr(std::shared_ptr<expr_node_t>& expr, bool final) {

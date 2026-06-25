@@ -104,6 +104,7 @@ namespace as {
         void resolve_pequs();
 
         uint32_t get_addend(std::vector<uint8_t>& data, uint32_t offset);
+        bool sym_imm(std::vector<uint8_t>& data, uint32_t offset);
 
         eval_result_t try_eval_expr(std::shared_ptr<expr_node_t>& expr, bool final = false);
 

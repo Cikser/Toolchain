@@ -212,7 +212,7 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                     m_backpatch_table.push_back(bp);
                 }
                 else if (it->second.defined && it->second.section == current_section().name) {
-                    emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0xF, 0x0, (uint16_t)(it->second.value - current_offset() - 4)));
+                    emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, 0xF, 0x0, (uint16_t)(it->second.value - current_offset() - 4)));
                 }
                 else {
                     emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0x0, 0x0, 0x8));

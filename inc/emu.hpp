@@ -51,7 +51,6 @@ namespace emu {
     class emulator{
     public:
         emulator() = default;
-        ~emulator();
 
         void emulate(const std::string& path);
 

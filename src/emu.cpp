@@ -16,8 +16,6 @@ void term_exit() {
     tcsetattr(STDIN_FILENO, TCSANOW, &original_term);
 }
 
-void empty_handler(int) {}
-
 void emu::emulator::emulate(const std::string& path) {
     load_memory(path);
     setup();
@@ -25,16 +23,6 @@ void emu::emulator::emulate(const std::string& path) {
     term_exit();
     std::cout << '\n';
     dump_registers();
-}
-
-emu::emulator::~emulator() {
-    if (m_terminal_thread.joinable()) {
-        pthread_kill(m_terminal_thread.native_handle(), SIGUSR1);
-        m_terminal_thread.join();
-    }
-    if (m_timer_thread.joinable()) {
-        m_timer_thread.join();
-    }
 }
 
 void emu::emulator::terminal() {
@@ -55,18 +43,15 @@ void emu::emulator::setup() {
     m_reg_file[0xF] = EXEC_START_ADDR;
     m_control_reg_file.fill(0);
     tcgetattr(STDIN_FILENO, &original_term);
-    struct sigaction sa = {};
-    sa.sa_handler = empty_handler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    sigaction(SIGUSR1, &sa, nullptr);
     termios new_term = original_term;
     new_term.c_lflag &= ~(ICANON | ECHO);
     new_term.c_cc[VMIN] = 1;
     new_term.c_cc[VTIME] = 0;
     tcsetattr(STDIN_FILENO, TCSANOW, &new_term);
     m_timer_thread = std::thread(&emu::emulator::timer, this);
+    m_timer_thread.detach();
     m_terminal_thread = std::thread(&emu::emulator::terminal, this);
+    m_terminal_thread.detach();
 }
 
 void emu::emulator::load_memory(const std::string& path) {
