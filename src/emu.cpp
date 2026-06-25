@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <csignal>
 #include <cstring>
+#include <format>
 
 termios original_term;
 
@@ -22,6 +23,8 @@ void emu::emulator::emulate(const std::string& path) {
     setup();
     run();
     term_exit();
+    std::cout << '\n';
+    dump_registers();
 }
 
 emu::emulator::~emulator() {
@@ -481,5 +484,19 @@ void emu::emulator::timer() {
         m_timer_mutex.lock();
         m_timer_ip = true;
         m_timer_mutex.unlock();
+    }
+}
+
+void emu::emulator::dump_registers() {
+    std::cout << "Emulated processor executed halt instruction\n";
+    std::cout << "Emulated processor state:\n";
+    for (size_t i = 0; i < m_reg_file.size(); ++i) {
+        std::cout << std::format("r{}={:#010x}", i, (uint32_t)(m_reg_file[i]));
+        if ((i + 1) % 4 == 0) {
+            std::cout << '\n';
+        } 
+        else {
+            std::cout << ' ';
+        }
     }
 }

@@ -175,7 +175,7 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                 sym.name = op.symbol;
                 sym.section = SECTION_UNDEF;
                 m_sym_table.insert({op.symbol, sym});
-                emit_short_pool_ld(reg, 0);
+                emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0x0, 0x0, 0x0));
                 backpatch_t bp{};
                 bp.symbol_name = op.symbol;
                 bp.section_name = m_current_section;
@@ -204,7 +204,7 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                 }
                 else if (!it->second.defined) {
                     // emit_pool_ld(reg, 0);
-                    emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0xF, 0x0, 0x0));
+                    emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0xF, 0x0, 0x8));
                     backpatch_t bp{};
                     bp.section_name = m_current_section;
                     bp.symbol_name = it->second.name;
@@ -215,7 +215,7 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                     emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0xF, 0x0, (uint16_t)(it->second.value - current_offset() - 4)));
                 }
                 else {
-                    emit_pool_ld(reg, 0);
+                    emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0x0, 0x0, 0x8));
                     backpatch_t bp{};
                     bp.section_name = m_current_section;
                     bp.symbol_name = op.symbol;
@@ -230,7 +230,7 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                 sym.section = SECTION_UNDEF;
                 m_sym_table.insert({op.symbol, sym});
                 // emit_pool_ld(reg, 0);
-                emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0xF, 0x0, 0x0));
+                emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0xF, 0x0, 0x8));
                 backpatch_t bp{};
                 bp.symbol_name = op.symbol;
                 bp.section_name = m_current_section;

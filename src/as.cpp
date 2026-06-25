@@ -440,7 +440,8 @@ void as::assembler::resolve_default_backpatch() {
 
 uint32_t as::assembler::get_addend(std::vector<uint8_t>& data, uint32_t offset) {
     uint8_t oc = (data[offset + 0] & 0xF0) >> 4;
-    if (oc == 0x9) {
+    uint8_t disp_lo = data[offset + 3];
+    if (oc == 0x9 && disp_lo == 0x8) {
         return 12;
     }
     return 8;

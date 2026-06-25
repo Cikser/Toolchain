@@ -261,6 +261,11 @@ void ld::linker::map_sections(std::vector<place_t>& place_requests) {
                 sym.value += section.address;
             }
         }
+        for (auto& [key, sym] : section.sym_table) {
+            if (sym.section_idx == section.idx) {
+                sym.value += section.address;
+            }
+        }
     }
 }
 

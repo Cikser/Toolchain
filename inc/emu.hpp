@@ -94,6 +94,8 @@ namespace emu {
 
         uint32_t read_mmio(uint32_t addr);
         void write_mmio(uint32_t addr, uint32_t value);
+
+        void dump_registers();
     };
 
 }
