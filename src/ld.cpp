@@ -6,6 +6,7 @@
 #include <iostream>
 #include <memory>
 #include <set>
+#include <algorithm>
 
 ld::linker::linker() {
     section_t section_undef{};
@@ -232,6 +233,10 @@ void ld::linker::first_pass(const std::vector<std::string>& input_paths, std::ve
 }
 
 void ld::linker::map_sections(std::vector<place_t>& place_requests) {
+    std::sort(place_requests.begin(), place_requests.end(), 
+        [](const place_t& first, const place_t& second) {
+            return first.address < second.address;
+    });
     uint32_t offset = 0;
     for (auto& section : m_section_table) {
         uint32_t address = (uint32_t)-1;

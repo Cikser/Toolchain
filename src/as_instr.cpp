@@ -107,27 +107,6 @@ void as::assembler::instr_st(int32_t reg, const operand_t& op) {
     emit_st(reg, op);
 }
 
-void as::assembler::emit_jump_and_literal(int32_t literal) {
-    emit_instruction(encode_instruction(0x3, 0x0, 0xF, 0x0, 0x0, 0x4));
-    emit_word(literal);
-}
-
-void as::assembler::emit_pool_ld(int32_t reg, int32_t literal) {
-    emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, 0xF, 0x0, 0x8));
-    emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, (uint8_t)reg, 0x0, 0x0));
-    emit_jump_and_literal(literal);
-}
-
-void as::assembler::emit_short_pool_ld(int32_t reg, int32_t literal) {
-    emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, 0xF, 0x0, 0x4));
-    emit_jump_and_literal(literal);
-}
-
-void as::assembler::emit_pool_st(int32_t reg, int32_t literal) {
-    emit_instruction(encode_instruction(0x8, 0x1, 0xF, 0x0, (uint8_t)reg, 0x4));
-    emit_jump_and_literal(literal);
-}
-
 void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
     if (reg == 0) {
         throw std::runtime_error("Unable to load value in r0");
@@ -138,7 +117,12 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                 emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0x0, 0x0, op.literal));
             }
             else {
-                emit_short_pool_ld(reg, op.literal);
+                emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, 0xF, 0x0, 0));
+                pool_entry_t pe{};
+                pe.literal = op.literal;
+                pe.type = pool_entry_type::LITERAL;
+                pe.offset = current_offset() - 4;
+                current_section().pool_entries.push_back(pe);
             }
             break;
         }
@@ -148,26 +132,13 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                 if (it->second.absolute && it->second.defined && check_bounds(it->second.value)) {
                     emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0x0, 0x0, (int16_t)it->second.value));
                 }
-                else if (it->second.absolute && it->second.defined) {
-                    emit_short_pool_ld(reg, it->second.value);
-                }
-                else if (!it->second.defined) {
-                    emit_short_pool_ld(reg, 0);
-                    backpatch_t bp{};
-                    bp.section_name = m_current_section;
-                    bp.symbol_name = it->second.name;
-                    bp.offset = current_offset() - 4;
-                    bp.type = backpatch_type::RELOC;
-                    m_backpatch_table.push_back(bp);
-                }
                 else {
-                    emit_short_pool_ld(reg, 0);
-                    backpatch_t bp{};
-                    bp.section_name = m_current_section;
-                    bp.symbol_name = op.symbol;
-                    bp.offset = current_offset() - 4;
-                    bp.type = backpatch_type::RELOC;
-                    m_backpatch_table.push_back(bp);
+                    emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, 0xF, 0x0, 0x0));
+                    pool_entry_t pe{};
+                    pe.symbol_name = op.symbol;
+                    pe.offset = current_offset() - 4;
+                    pe.type = pool_entry_type::SYMBOL;
+                    current_section().pool_entries.push_back(pe);
                 }
             }
             else {
@@ -175,12 +146,12 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                 sym.name = op.symbol;
                 sym.section = SECTION_UNDEF;
                 m_sym_table.insert({op.symbol, sym});
-                emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0x0, 0x0, 0x0));
-                backpatch_t bp{};
-                bp.symbol_name = op.symbol;
-                bp.section_name = m_current_section;
-                bp.offset = current_offset() - 4;
-                m_backpatch_table.push_back(bp);
+                emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, 0xF, 0x0, 0x0));
+                pool_entry_t pe{};
+                pe.symbol_name = op.symbol;
+                pe.offset = current_offset() - 4;
+                pe.type = pool_entry_type::SYMBOL;
+                current_section().pool_entries.push_back(pe);
             }
             break;
         }
@@ -189,39 +160,33 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                 emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, 0, 0, (int16_t)op.literal));
             }
             else {
-                emit_pool_ld(reg, op.literal);
+                emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, 0xF, 0x0, 0x0));
+                pool_entry_t pe{};
+                pe.literal = op.literal;
+                pe.offset = current_offset() - 4;
+                pe.type = pool_entry_type::LITERAL;
+                current_section().pool_entries.push_back(pe);
+                emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, (uint8_t)reg, 0x0, 0x0));
             }
             break;
         }
         case operand_type::SYMBOL_MEM: {
             auto it = m_sym_table.find(op.symbol);
             if (it != m_sym_table.end()) {
-                if (it->second.absolute && check_bounds(it->second.value)) {
+                if (it->second.absolute && it->second.defined && check_bounds(it->second.value)) {
                     emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, 0x0, 0x0, (int16_t)it->second.value));
-                }
-                else if (it->second.absolute) {
-                    emit_pool_ld(reg, it->second.value);
-                }
-                else if (!it->second.defined) {
-                    // emit_pool_ld(reg, 0);
-                    emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0xF, 0x0, 0x8));
-                    backpatch_t bp{};
-                    bp.section_name = m_current_section;
-                    bp.symbol_name = it->second.name;
-                    bp.offset = current_offset() - 4;
-                    m_backpatch_table.push_back(bp);
                 }
                 else if (it->second.defined && it->second.section == current_section().name) {
                     emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, 0xF, 0x0, (uint16_t)(it->second.value - current_offset() - 4)));
                 }
                 else {
-                    emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0x0, 0x0, 0x8));
-                    backpatch_t bp{};
-                    bp.section_name = m_current_section;
-                    bp.symbol_name = op.symbol;
-                    bp.offset = current_offset() - 4;
-                    bp.type = backpatch_type::RELOC;
-                    m_backpatch_table.push_back(bp);
+                    emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, 0xF, 0x0, 0x0));
+                    pool_entry_t pe{};
+                    pe.symbol_name = op.symbol;
+                    pe.offset = current_offset() - 4;
+                    pe.type = pool_entry_type::SYMBOL;
+                    current_section().pool_entries.push_back(pe);
+                    emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, (uint8_t)reg, 0x0, 0x0));
                 }
             }
             else {
@@ -229,13 +194,13 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                 sym.name = op.symbol;
                 sym.section = SECTION_UNDEF;
                 m_sym_table.insert({op.symbol, sym});
-                // emit_pool_ld(reg, 0);
-                emit_instruction(encode_instruction(0x9, 0x1, (uint8_t)reg, 0xF, 0x0, 0x8));
-                backpatch_t bp{};
-                bp.symbol_name = op.symbol;
-                bp.section_name = m_current_section;
-                bp.offset = current_offset() - 4;
-                m_backpatch_table.push_back(bp);
+                emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, 0xF, 0x0, 0x0));
+                pool_entry_t pe{};
+                pe.symbol_name = op.symbol;
+                pe.offset = current_offset() - 4;
+                pe.type = pool_entry_type::SYMBOL;
+                current_section().pool_entries.push_back(pe);
+                emit_instruction(encode_instruction(0x9, 0x2, (uint8_t)reg, (uint8_t)reg, 0x0, 0x0));
             }
             break;
         }
@@ -276,7 +241,7 @@ void as::assembler::emit_ld(const operand_t& op, int32_t reg) {
                 backpatch_t bp{};
                 bp.section_name = m_current_section;
                 bp.symbol_name = op.symbol;
-                bp.offset = current_offset() - 2;
+                bp.offset = current_offset() - 4;
                 bp.type = backpatch_type::BOUNDS;
                 m_backpatch_table.push_back(bp);
             }
@@ -294,7 +259,12 @@ void as::assembler::emit_st(int32_t reg, const operand_t& op) {
                 emit_instruction(encode_instruction(0x8, 0x0, 0x0, 0x0, (uint8_t)reg, op.literal));
             }
             else {
-                emit_pool_st(reg, op.literal);
+                emit_instruction(encode_instruction(0x8, 0x2, 0xF, 0x0, (uint8_t)reg, 0x0));
+                pool_entry_t pe{};
+                pe.literal = op.literal;
+                pe.offset = current_offset() - 4;
+                pe.type = pool_entry_type::LITERAL;
+                current_section().pool_entries.push_back(pe);
             }
             break;
         }
@@ -304,29 +274,16 @@ void as::assembler::emit_st(int32_t reg, const operand_t& op) {
                 if (it->second.absolute && check_bounds(it->second.value)) {
                     emit_instruction(encode_instruction(0x8, 0x0, 0x0, 0x0, (uint8_t)reg, (int16_t)it->second.value));
                 }
-                else if (it->second.absolute) {
-                    emit_pool_st(reg, it->second.value);
-                }
-                else if (!it->second.defined) {
-                    // emit_pool_st(reg, 0);
-                    emit_instruction(encode_instruction(0x8, 0x0, 0x0, 0xF, (uint8_t)reg, 0x0));
-                    backpatch_t bp{};
-                    bp.section_name = m_current_section;
-                    bp.symbol_name = it->second.name;
-                    bp.offset = current_offset() - 4;
-                    m_backpatch_table.push_back(bp);
-                }
                 else if (it->second.defined && it->second.section == current_section().name) {
                     emit_instruction(encode_instruction(0x8, 0x0, 0x0, 0xF, (uint8_t)reg, (uint16_t)(it->second.value - current_offset() - 4)));
                 }
                 else {
-                    emit_pool_st(reg, 0);
-                    backpatch_t bp{};
-                    bp.section_name = m_current_section;
-                    bp.symbol_name = op.symbol;
-                    bp.offset = current_offset() - 4;
-                    bp.type = backpatch_type::RELOC;
-                    m_backpatch_table.push_back(bp);
+                    emit_instruction(encode_instruction(0x8, 0x2, 0x0, 0xF, (uint8_t)reg, 0x0));
+                    pool_entry_t pe{};
+                    pe.symbol_name = op.symbol;
+                    pe.offset = current_offset() - 4;
+                    pe.type = pool_entry_type::SYMBOL;
+                    current_section().pool_entries.push_back(pe);
                 }
             }
             else {
@@ -334,13 +291,12 @@ void as::assembler::emit_st(int32_t reg, const operand_t& op) {
                 sym.name = op.symbol;
                 sym.section = SECTION_UNDEF;
                 m_sym_table.insert({op.symbol, sym});
-                // emit_pool_st(reg, 0);
-                emit_instruction(encode_instruction(0x8, 0x0, 0xF, 0x0, (uint8_t)reg, 0x0));
-                backpatch_t bp{};
-                bp.symbol_name = op.symbol;
-                bp.section_name = m_current_section;
-                bp.offset = current_offset() - 4;
-                m_backpatch_table.push_back(bp);
+                emit_instruction(encode_instruction(0x8, 0x2, 0x0, 0xF, (uint8_t)reg, 0x0));
+                pool_entry_t pe{};
+                pe.symbol_name = op.symbol;
+                pe.offset = current_offset() - 4;
+                pe.type = pool_entry_type::SYMBOL;
+                current_section().pool_entries.push_back(pe);
             }
             break;
         }
@@ -377,7 +333,7 @@ void as::assembler::emit_st(int32_t reg, const operand_t& op) {
                 backpatch_t bp{};
                 bp.section_name = m_current_section;
                 bp.symbol_name = op.symbol;
-                bp.offset = current_offset() - 2;
+                bp.offset = current_offset() - 4;
                 bp.type = backpatch_type::BOUNDS;
                 m_backpatch_table.push_back(bp);
             }
@@ -396,8 +352,12 @@ void as::assembler::emit_jump_or_call(uint8_t oc, uint8_t mod_direct, uint8_t mo
                 emit_instruction(encode_instruction(oc, mod_direct, 0x0, regB, regC, op.literal));
             }
             else {
-                emit_instruction(encode_instruction(oc, mod_mem, 0xF, regB, regC, 0x4));
-                emit_jump_and_literal(op.literal);
+                emit_instruction(encode_instruction(oc, mod_mem, 0xF, regB, regC, 0x0));
+                pool_entry_t pe{};
+                pe.literal = op.literal;
+                pe.offset = current_offset() - 4;
+                pe.type = pool_entry_type::LITERAL;
+                current_section().pool_entries.push_back(pe);
             }
             break;
         }
@@ -407,32 +367,16 @@ void as::assembler::emit_jump_or_call(uint8_t oc, uint8_t mod_direct, uint8_t mo
                 if (it->second.absolute && check_bounds(it->second.value)) {
                     emit_instruction(encode_instruction(oc, mod_direct, 0x0, regB, regC, it->second.value));
                 }
-                else if (it->second.absolute) {
-                    emit_instruction(encode_instruction(oc, mod_mem, 0xF, regB, regC, 0x4));
-                    emit_jump_and_literal(it->second.value);
-                }
-                else if (!it->second.defined) {
-                    emit_instruction(encode_instruction(oc, mod_direct, 0xF, regB, regC, 0x0));
-                    // emit_jump_and_literal(it->second.value);
-                    backpatch_t bp{};
-                    bp.section_name = m_current_section;
-                    bp.symbol_name = it->second.name;
-                    bp.offset = current_offset() - 4;
-                    m_backpatch_table.push_back(bp);
-                }
-                else if (it->second.section == current_section().name) {
+                else if (it->second.defined && it->second.section == current_section().name) {
                     emit_instruction(encode_instruction(oc, mod_direct, 0xF, regB, regC, it->second.value - current_offset() - 4));
-                    current_section().possible_bp.push_back({it->second.name, current_offset() - 4});
                 }
                 else {
-                    emit_instruction(encode_instruction(oc, mod_mem, 0xF, regB, regC, 0x4));
-                    emit_jump_and_literal(0);
-                    backpatch_t bp{};
-                    bp.section_name = m_current_section;
-                    bp.symbol_name = op.symbol;
-                    bp.offset = current_offset() - 4;
-                    bp.type = backpatch_type::RELOC;
-                    m_backpatch_table.push_back(bp);
+                    emit_instruction(encode_instruction(oc, mod_mem, 0xF, regB, regC, 0x0));
+                    pool_entry_t pe{};
+                    pe.symbol_name = op.symbol;
+                    pe.offset = current_offset() - 4;
+                    pe.type = pool_entry_type::SYMBOL;
+                    current_section().pool_entries.push_back(pe);
                 }
             }
             else {
@@ -440,13 +384,12 @@ void as::assembler::emit_jump_or_call(uint8_t oc, uint8_t mod_direct, uint8_t mo
                 sym.name = op.symbol;
                 sym.section = SECTION_UNDEF;
                 m_sym_table.insert({op.symbol, sym});
-                emit_instruction(encode_instruction(oc, mod_direct, 0xF, regB, regC, 0x4));
-                // emit_jump_and_literal(0);
-                backpatch_t bp{};
-                bp.symbol_name = op.symbol;
-                bp.section_name = m_current_section;
-                bp.offset = current_offset() - 4;
-                m_backpatch_table.push_back(bp);
+                emit_instruction(encode_instruction(oc, mod_mem, 0xF, regB, regC, 0x0));
+                pool_entry_t pe{};
+                pe.symbol_name = op.symbol;
+                pe.offset = current_offset() - 4;
+                pe.type = pool_entry_type::SYMBOL;
+                current_section().pool_entries.push_back(pe);
             }
             break;
         }

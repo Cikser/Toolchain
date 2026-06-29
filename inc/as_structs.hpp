@@ -37,12 +37,21 @@ namespace as {
         bool is_extern = false;
     };
 
+    enum class pool_entry_type { SYMBOL, LITERAL };
+
+    struct pool_entry_t {
+        std::string symbol_name;
+        uint32_t literal;
+        uint32_t offset;
+        pool_entry_type type;
+    };
+
     struct section_t {
         std::string name;
         uint32_t idx = 0;
         std::vector<uint8_t> data;
         std::vector<relocation_t> relocations;
-        std::vector<std::pair<std::string, uint32_t>> possible_bp;
+        std::vector<pool_entry_t> pool_entries;
     };
 
     enum class backpatch_type {

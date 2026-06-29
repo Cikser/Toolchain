@@ -40,6 +40,7 @@ void as::assembler::dir_extern(const std::vector<std::string>& symbols) {
 }
 
 void as::assembler::dir_section(const std::string& section_name) {
+    check_pool(true);
     auto it = m_section_table.find(section_name);
     auto sym_it = m_sym_table.find(section_name);
     if (it == m_section_table.end()) {

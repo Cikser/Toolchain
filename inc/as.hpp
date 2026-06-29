@@ -74,37 +74,18 @@ namespace as {
         void emit_jump_or_call(uint8_t oc, uint8_t mod_direct, uint8_t mod_mem,
                     uint8_t regB, uint8_t regC, const operand_t& op);
 
-        void emit_jump_and_literal(int32_t literal);
-        void emit_pool_ld(int32_t reg, int32_t literal);
-        void emit_pool_st(int32_t reg, int32_t literal);
-        void emit_short_pool_ld(int32_t reg, int32_t literal);
-
         void emit_ld(const operand_t& op, int32_t reg);
         void emit_st(int32_t reg, const operand_t& op);
 
         bool check_bounds(int32_t literal);
-
-        void change_instr_mod(std::vector<uint8_t>& data, uint32_t index, uint8_t value);
-        void change_instr_reg(std::vector<uint8_t>& data, uint32_t index, uint8_t value);
-        void change_instr_disp(std::vector<uint8_t>& data, uint32_t index, int16_t value);
-        void insert_jump_and_literal(std::vector<uint8_t>& data, uint32_t index, int32_t literal, uint32_t addend);
-        void update_symbols(const section_t& section, uint32_t offset, uint32_t addend);
-        void update_bp(const std::string& section, uint32_t offset, uint32_t addend);
-        void update_bp_vec(std::vector<backpatch_t>& bps, const std::string& section,  uint32_t offset, uint32_t addend);
-        void update_fault(section_t& section, uint32_t offset, uint32_t addend);
-        void update_reloc(section_t& section, uint32_t offset, uint32_t addend);
-
-        void convert_to_pool(std::vector<uint8_t>& data, uint32_t index, int32_t literal, uint32_t addend);
+        void check_pool(bool end_of_section = false);
+        void insert_instr_disp(std::vector<uint8_t>& data, uint32_t index, uint16_t value);
 
         void resolve_bounds_backpatch();
         void resolve_reloc_backpatch();
-        void resolve_default_backpatch();
         void resolve_symbols();
         void resolve_backpatch();
         void resolve_pequs();
-
-        uint32_t get_addend(std::vector<uint8_t>& data, uint32_t offset);
-        bool sym_imm(std::vector<uint8_t>& data, uint32_t offset);
 
         eval_result_t try_eval_expr(std::shared_ptr<expr_node_t>& expr, bool final = false);
 

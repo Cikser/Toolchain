@@ -111,7 +111,7 @@ uint8_t emu::emulator::read_byte(uint32_t addr) {
     auto it = m_memory.find(addr & MEM_BLOCK_MASK);
     if (it == m_memory.end()) {
         term_exit();
-        throw std::runtime_error(std::format("Page fault at address 0x{:08x}", addr));
+        throw std::runtime_error(std::format("Page fault read at address 0x{:08x}", addr));
     }
     return it->second.at(addr & ~MEM_BLOCK_MASK);
 }
@@ -157,7 +157,7 @@ emu::instruction emu::emulator::read_instruction(uint32_t addr) {
 uint32_t emu::emulator::read_mmio(uint32_t addr) {
     if (addr != MMIO_TERM_IN) {
         term_exit();
-        throw std::runtime_error(std::format("Page fault at address 0x{:08x}", addr));
+        throw std::runtime_error(std::format("Page fault read at address 0x{:08x}", addr));
     }
     return m_term_buffer;
 }
@@ -165,7 +165,7 @@ uint32_t emu::emulator::read_mmio(uint32_t addr) {
 void emu::emulator::write_mmio(uint32_t addr, uint32_t value) {
     if (addr != MMIO_TERM_OUT && addr != MMIO_TIMER_CFG) {
         term_exit();
-        throw std::runtime_error(std::format("Page fault at address 0x{:08x}", addr));
+        throw std::runtime_error(std::format("Page fault write at address 0x{:08x}", addr));
     }
     if (addr == MMIO_TERM_OUT) {
         write(STDOUT_FILENO, &value, 1);
@@ -245,23 +245,23 @@ void emu::emulator::execute_instruction() {
                     } 
                     break;
                 }
-                case 0x4: {
+                case 0x8: {
                     pc = read_word(pc = m_reg_file.at(instr.reg_a) + instr.disp);
                     break;
                 }
-                case 0x5: {
+                case 0x9: {
                     if (m_reg_file.at(instr.reg_b) == m_reg_file.at(instr.reg_c)) {
                         pc = read_word(pc = m_reg_file.at(instr.reg_a) + instr.disp);
                     } 
                     break;
                 }
-                case 0x6: {
+                case 0xA: {
                     if (m_reg_file.at(instr.reg_b) != m_reg_file.at(instr.reg_c)) {
                         pc = read_word(pc = m_reg_file.at(instr.reg_a) + instr.disp);
                     } 
                     break;
                 }
-                case 0x7: {
+                case 0xB: {
                     if ((int32_t)m_reg_file.at(instr.reg_b) > (int32_t)m_reg_file.at(instr.reg_c)) {
                         pc = read_word(pc = m_reg_file.at(instr.reg_a) + instr.disp);
                     } 
