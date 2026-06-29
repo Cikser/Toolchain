@@ -232,31 +232,69 @@ void ld::linker::first_pass(const std::vector<std::string>& input_paths, std::ve
     }
 }
 
+namespace ld {
+    struct interval {
+        uint32_t start, end;
+        std::string name;
+        bool operator<(const interval& other) const {
+            return end < other.start;
+        }
+    };
+}
+
 void ld::linker::map_sections(std::vector<place_t>& place_requests) {
-    std::sort(place_requests.begin(), place_requests.end(), 
-        [](const place_t& first, const place_t& second) {
-            return first.address < second.address;
+    std::sort(place_requests.begin(), place_requests.end(),
+        [](const place_t& a, const place_t& b) {
+            return a.address < b.address;
     });
-    uint32_t offset = 0;
+    std::set<interval> placed_intervals;
+    auto check_and_insert = [&](uint32_t start, uint32_t end, const std::string& name) {
+        interval iv{start, end, name};
+        auto it = placed_intervals.lower_bound(iv);
+        if (it != placed_intervals.end() && it->start < end) {
+            throw std::runtime_error("Section " + name + " overlaps with section " + it->name);
+        }
+        if (it != placed_intervals.begin()) {
+            --it;
+            if (it->end > start) {
+                throw std::runtime_error("Section " + name + " overlaps with section " + it->name);
+            }
+        }
+        placed_intervals.insert(iv);
+    };
+    std::unordered_map<std::string, uint32_t> place_map;
+    for (auto& req : place_requests) {
+        if (place_map.count(req.section_name)) {
+            throw std::runtime_error("Duplicate place request for section " + req.section_name);
+        }
+        place_map[req.section_name] = req.address;
+    }
     for (auto& section : m_section_table) {
-        uint32_t address = (uint32_t)-1;
-        auto place_it = place_requests.end();
-        for (auto iterator = place_requests.begin(); iterator != place_requests.end(); ++iterator) {
-            if (iterator->section_name == section.name) {
-                address = iterator->address;
-                place_it = iterator;
-                break;
-            }
+        auto it = place_map.find(section.name);
+        if (it == place_map.end()) {
+            continue;
         }
-        if (address != (uint32_t)-1) {
-            place_requests.erase(place_it);
-            if (address < offset) {
-                throw std::runtime_error("Section " + section.name + " can not be placed at address " + std::to_string(address));
-            }
-            offset = address;
+        uint32_t start = it->second;
+        uint32_t end = start + (uint32_t)section.data.size();
+        check_and_insert(start, end, section.name);
+        section.address = start;
+        place_requests.erase(
+            std::remove_if(place_requests.begin(), place_requests.end(),
+                [&](const place_t& r) { return r.section_name == section.name; }),
+            place_requests.end());
+    }
+    uint32_t unplaced_offset = 0;
+    if (!placed_intervals.empty()) {
+        unplaced_offset = placed_intervals.rbegin()->end;
+    }
+    for (auto& section : m_section_table) {
+        if (place_map.contains(section.name)) {
+            continue;
         }
-        section.address = offset;
-        offset += section.data.size();
+        section.address  = unplaced_offset;
+        unplaced_offset += (uint32_t)section.data.size();
+    }
+    for (auto& section : m_section_table) {
         auto it = m_sym_table.find(section.name);
         if (it != m_sym_table.end()) {
             it->second.value = section.address;
