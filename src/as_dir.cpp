@@ -110,37 +110,24 @@ void as::assembler::dir_equ(const std::string& symbol_name, std::shared_ptr<expr
     if (it != m_sym_table.end() && (it->second.defined || it->second.is_extern)) {
         throw std::runtime_error("Symbol " + symbol_name + " already defined");
     }
-    eval_result_t result = try_eval_expr(expr);
-    if (result.absolute) {
-        if (it != m_sym_table.end()) {
-            it->second.absolute = true;
-            it->second.defined = true;
-            it->second.value = result.value;
-            it->second.section = SECTION_ABS;
-        }
-        else {
-            symbol_t sym{};
-            sym.absolute = true;
-            sym.name = symbol_name;
-            sym.section = SECTION_ABS;
-            sym.defined = true;
-            sym.value = result.value;
-            m_sym_table.insert({symbol_name, sym});
-        }
+    expr_result_t result = try_eval_expression(expr);
+    if (result.status == eval_status::INVALID) {
+        throw std::runtime_error("Invalid relocation combination in .equ expression for symbol " + symbol_name);
     }
-    else {
-        if (it == m_sym_table.end()) {
-            symbol_t sym{};
-            sym.absolute = true;
-            sym.name = symbol_name;
-            sym.section = SECTION_ABS;
-            m_sym_table.insert({symbol_name, sym});
-        }
-        pending_equ_t pequ{};
-        pequ.expr = expr;
-        pequ.symbol = symbol_name;
-        m_pequ_table.push_back(pequ);
+    if (result.status == eval_status::RESOLVED) {
+        finalize_equ_symbol(symbol_name, result);
+        return;
     }
+    if (it == m_sym_table.end()) {
+        symbol_t sym{};
+        sym.name = symbol_name;
+        sym.section = SECTION_UNDEF;
+        m_sym_table.insert({symbol_name, sym});
+    }
+    pending_equ_t pequ{};
+    pequ.symbol = symbol_name;
+    pequ.expr = std::move(expr);
+    m_pequ_table.push_back(pequ);
 }
 
 void as::assembler::dir_end() {}

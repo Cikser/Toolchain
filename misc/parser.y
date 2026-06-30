@@ -48,6 +48,7 @@ void yyerror(as::assembler* as, const char* msg) {
 
 %token TOK_COMMA TOK_COLON TOK_DOLLAR
 %token TOK_LBRACKET TOK_RBRACKET TOK_PLUS TOK_MINUS TOK_STAR TOK_SLASH
+%token TOK_LPAREN TOK_RPAREN
 %token TOK_UNKNOWN
 
 %type <operand>   operand
@@ -131,6 +132,10 @@ equ_expr
             n->left = std::shared_ptr<as::expr_node_t>(zero);
             n->right = std::shared_ptr<as::expr_node_t>($2);
             $$ = n;
+        }
+    | TOK_LPAREN equ_expr TOK_RPAREN
+        { 
+            $$ = $2; 
         }
     | TOK_LITERAL
         {

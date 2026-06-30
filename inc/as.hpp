@@ -87,7 +87,9 @@ namespace as {
         void resolve_backpatch();
         void resolve_pequs();
 
-        eval_result_t try_eval_expr(std::shared_ptr<expr_node_t>& expr, bool final = false);
+        node_eval_t eval_node(const std::shared_ptr<expr_node_t>& node);
+        expr_result_t try_eval_expression(const std::shared_ptr<expr_node_t>& expr);
+        void finalize_equ_symbol(const std::string& symbol_name, const expr_result_t& result);
 
         void write_elf(const std::string& path);
         void write_dump(const std::string& path);

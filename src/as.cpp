@@ -227,27 +227,39 @@ void as::assembler::resolve_reloc_backpatch() {
                 continue;
             }
             symbol_t& sym = it->second;
+            section_t& section = m_section_table.at(bp.section_name);
             if (sym.absolute) {
-                section_t& section = m_section_table.at(bp.section_name);
-                section.data[bp.offset] = sym.value & 0xFF;
-                section.data[bp.offset + 1] = sym.value & 0xFF << 8;
-                section.data[bp.offset + 2] = sym.value & 0xFF << 16;
-                section.data[bp.offset + 3] = sym.value & 0xFF << 24;
+                uint32_t value = (uint32_t)sym.value;
+                section.data[bp.offset + 0] = (value >> 0) & 0xFF;
+                section.data[bp.offset + 1] = (value >> 8) & 0xFF;
+                section.data[bp.offset + 2] = (value >> 16) & 0xFF;
+                section.data[bp.offset + 3] = (value >> 24) & 0xFF;
+            }
+            else if (sym.section.rfind(EXTERN_SECTION_PREFIX, 0) == 0) {
+                relocation_t reloc{};
+                reloc.section_name = bp.section_name;
+                reloc.offset = bp.offset;
+                reloc.type = relocation_type::R_32;
+                reloc.symbol_name = sym.section.substr(PREFIX_LEN);
+                reloc.addend = sym.value;
+                section.relocations.push_back(reloc);
+            }
+            else if (sym.global) {
+                relocation_t reloc{};
+                reloc.section_name = bp.section_name;
+                reloc.offset = bp.offset;
+                reloc.type = relocation_type::R_32;
+                reloc.symbol_name  = sym.name;
+                reloc.addend = 0;
+                section.relocations.push_back(reloc);
             }
             else {
                 relocation_t reloc{};
                 reloc.section_name = bp.section_name;
                 reloc.offset = bp.offset;
                 reloc.type = relocation_type::R_32;
-                if (sym.global) {
-                    reloc.symbol_name = sym.name;
-                    reloc.addend = 0;
-                }
-                else {
-                    reloc.symbol_name = sym.section;
-                    reloc.addend = sym.value;
-                }
-                section_t& section = m_section_table.find(bp.section_name)->second;
+                reloc.symbol_name = sym.section;
+                reloc.addend = sym.value;
                 section.relocations.push_back(reloc);
             }
             bps.erase(iterator);
@@ -271,75 +283,124 @@ void as::assembler::resolve_backpatch() {
     }
 }
 
-as::eval_result_t as::assembler::try_eval_expr(std::shared_ptr<expr_node_t>& expr, bool final) {
-    eval_result_t out{};
-    if (!expr->is_binary) {
-        if (expr->is_literal) {
-            out.value = expr->literal;
-            out.absolute = true;
-            out.valid = true;
-            return out;
+as::node_eval_t as::assembler::eval_node(const std::shared_ptr<expr_node_t>& node) {
+    node_eval_t result;
+    if (!node->is_binary) {
+        if (node->is_literal) {
+            result.value = node->literal;
+            return result;
         }
-        auto it = m_sym_table.find(expr->symbol);
-        if (it != m_sym_table.end()) {
-            symbol_t& sym = it->second;
-            if (it->second.absolute && it->second.defined) {
-                out.value = it->second.value;
-                out.valid = true;
-                out.absolute = true;
-                return out;
-            }
-            else {
-                out.value = sym.value;
-                out.section = sym.section;
-                out.valid = true;
-                return out;
-            }
+        auto it = m_sym_table.find(node->symbol);
+        if (it == m_sym_table.end()) {
+            symbol_t sym{};
+            sym.name = node->symbol;
+            sym.section = SECTION_UNDEF;
+            m_sym_table.insert({node->symbol, sym});
+            result.deferred = true;
+            return result;
         }
-        symbol_t sym{};
-        sym.name = expr->symbol;
-        m_sym_table.insert({sym.name, sym});
-        out.valid = false;
-        return out;
+        const symbol_t& sym = it->second;
+        if (sym.absolute && sym.defined) {
+            result.value = sym.value;
+            return result;
+        }
+        if (sym.is_extern) {
+            result.coeffs[EXTERN_SECTION_PREFIX + sym.name] = 1;
+            result.value = 0;
+            return result;
+        }
+        if (sym.defined) {
+            result.coeffs[sym.section] = 1;
+            result.value = sym.value;
+            return result;
+        }
+        result.deferred = true;
+        return result;
     }
-    eval_result_t left = try_eval_expr(expr->left);
-    eval_result_t right = try_eval_expr(expr->right);
-    switch (expr->type) {
+    node_eval_t left = eval_node(node->left);
+    node_eval_t right = eval_node(node->right);
+    if (left.deferred || right.deferred) {
+        result.deferred = true;
+        return result;
+    }
+    switch (node->type) {
         case expr_type::ADD: {
-            out.value = left.value + right.value;
+            result.value = left.value + right.value;
+            result.coeffs = left.coeffs;
+            for (auto& [sec, c] : right.coeffs) {
+                result.coeffs[sec] += c;
+            }
             break;
         }
         case expr_type::SUB: {
-            out.value = left.value - right.value;
+            result.value = left.value - right.value;
+            result.coeffs = left.coeffs;
+            for (auto& [sec, c] : right.coeffs) {
+                result.coeffs[sec] -= c;
+            }
             break;
         }
-        case expr_type::MUL: {
-            out.value = left.value * right.value;
-            break;
-        }
+        case expr_type::MUL:
         case expr_type::DIV: {
-            out.value = left.value / right.value;
+            if (!left.coeffs.empty() || !right.coeffs.empty()) {
+                throw std::runtime_error("Relocatable or external symbol used in multiplication/division");
+            }
+            result.value = (node->type == expr_type::MUL)
+                          ? left.value * right.value
+                          : left.value / right.value;
             break;
         }
     }
-    if (left.absolute && right.absolute) {
-        out.absolute = true;
-        out.valid = true;
+    std::erase_if(result.coeffs, [](const auto& kv) { return kv.second == 0; });
+    return result;
+}
+
+as::expr_result_t as::assembler::try_eval_expression(const std::shared_ptr<expr_node_t>& expr) {
+    expr_result_t out{};
+    node_eval_t r;
+    try {
+        r = eval_node(expr);
+    }
+    catch (const std::exception&) {
+        out.status = eval_status::INVALID;
         return out;
     }
-    if ((expr->type == expr_type::MUL || expr->type == expr_type::DIV) && (!left.absolute || !right.absolute)) {
+    if (r.deferred) {
+        out.status = eval_status::DEFERRED;
         return out;
     }
-    if (!left.absolute && !right.absolute && left.section != right.section) {
+    if (r.coeffs.empty()) {
+        out.status = eval_status::RESOLVED;
+        out.section = SECTION_ABS;
+        out.value = r.value;
         return out;
     }
-    if (!left.absolute && !right.absolute && left.section == right.section && final) {
-        out.absolute = true;
-        out.valid = true;
-        return out;
+    if (r.coeffs.size() == 1) {
+        const auto& [sec, coeff] = *r.coeffs.begin();
+        if (coeff == 1) {
+            out.status = eval_status::RESOLVED;
+            out.section = sec;
+            out.value = r.value;
+            return out;
+        }
     }
-    out.valid = true;
+    out.status = eval_status::INVALID;
     return out;
+}
+
+void as::assembler::finalize_equ_symbol(const std::string& symbol_name, const expr_result_t& result) {
+    symbol_t& sym = m_sym_table[symbol_name];
+    sym.name = symbol_name;
+    sym.defined = true;
+    sym.value = result.value;
+    if (result.section == SECTION_ABS) {
+        sym.absolute = true;
+        sym.section = SECTION_ABS;
+    }
+    else {
+        sym.absolute = false;
+        sym.section = result.section;
+    }
 }
 
 void as::assembler::resolve_pequs() {
@@ -348,21 +409,20 @@ void as::assembler::resolve_pequs() {
         change = false;
         for (auto iterator = m_pequ_table.begin(); iterator != m_pequ_table.end(); ++iterator) {
             pending_equ_t& pequ = *iterator;
-            eval_result_t result = try_eval_expr(pequ.expr, true);
-            if (!result.absolute) {
+            expr_result_t result = try_eval_expression(pequ.expr);
+            if (result.status == eval_status::INVALID) {
+                throw std::runtime_error("Invalid relocation combination in .equ expression for symbol " + pequ.symbol);
+            }
+            if (result.status == eval_status::DEFERRED) {
                 continue;
             }
-            symbol_t& sym = m_sym_table.at(pequ.symbol);
-            sym.value = result.value;
-            sym.defined = true;
-            sym.absolute = true;
-            sym.section = SECTION_ABS;
+            finalize_equ_symbol(pequ.symbol, result);
             change = true;
             m_pequ_table.erase(iterator);
             break;
         }
     }
     if (!m_pequ_table.empty()) {
-        throw std::runtime_error("Unable to complete .equ evaluation");
+        throw std::runtime_error("Unable to complete .equ evaluation: unresolved forward references");
     }
 }

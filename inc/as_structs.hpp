@@ -17,6 +17,9 @@ namespace as {
     #define SECTION_UNDEF_IDX 0
     #define SECTION_ABS_IDX ((uint32_t)-1)
 
+    #define EXTERN_SECTION_PREFIX "@extern:"
+    #define PREFIX_LEN 9
+
     enum class relocation_type { R_PC_REL, R_32 };
 
     struct relocation_t {
@@ -102,16 +105,27 @@ namespace as {
         bool is_literal;
     };
 
+    enum class eval_status {
+        RESOLVED,
+        DEFERRED,
+        INVALID
+    };
+
+    struct expr_result_t {
+        eval_status status = eval_status::DEFERRED;
+        std::string section = SECTION_ABS;
+        int32_t value = 0;
+    };
+
+    struct node_eval_t {
+        bool deferred = false;
+        int32_t value = 0;
+        std::unordered_map<std::string, int32_t> coeffs;
+    };
+
     struct pending_equ_t {
         std::string symbol;
         std::shared_ptr<expr_node_t> expr;
-    };
-
-    struct eval_result_t {
-        std::string section = SECTION_UNDEF;
-        int32_t value = 0;
-        bool absolute = false;
-        bool valid = false;
     };
 }
 

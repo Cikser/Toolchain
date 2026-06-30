@@ -102,6 +102,8 @@
 "-"                     { return TOK_MINUS; }
 "*"                     { return TOK_STAR; }
 "/"                     { return TOK_SLASH; }
+"("                     { return TOK_LPAREN; }
+")"                     { return TOK_RPAREN; }
 
 .                       { 
                             fprintf(stderr, "Unknown token: %s\n", yytext);
