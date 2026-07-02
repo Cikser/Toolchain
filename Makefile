@@ -24,7 +24,7 @@ LD_OBJS = $(patsubst $(SRC_DIR)/ld%.cpp, $(BUILD_DIR)/ld%.o, $(LD_SRCS))
 
 EMU_OBJS = $(patsubst $(SRC_DIR)/emu%.cpp, $(BUILD_DIR)/emu%.o, $(EMU_SRCS))
 
-ASSEMBLER = asembler
+ASSEMBLER = assembler
 LINKER = linker
 EMULATOR = emulator
 
