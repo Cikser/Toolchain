@@ -8,7 +8,8 @@
 #include <unistd.h>
 #include <csignal>
 #include <cstring>
-#include <format>
+#include <sstream>
+#include <iomanip>
 
 termios original_term;
 
@@ -110,7 +111,9 @@ uint8_t emu::emulator::read_byte(uint32_t addr) {
     auto it = m_memory.find(addr & MEM_BLOCK_MASK);
     if (it == m_memory.end()) {
         term_exit();
-        throw std::runtime_error(std::format("Page fault read at address 0x{:08x}", addr));
+        std::ostringstream oss;
+        oss << "Page fault read at address 0x" << std::hex << std::setw(8) << std::setfill('0') << addr;
+        throw std::runtime_error(oss.str());
     }
     return it->second.at(addr & ~MEM_BLOCK_MASK);
 }
@@ -156,7 +159,9 @@ emu::instruction emu::emulator::read_instruction(uint32_t addr) {
 uint32_t emu::emulator::read_mmio(uint32_t addr) {
     if (addr != MMIO_TERM_IN) {
         term_exit();
-        throw std::runtime_error(std::format("Page fault read at address 0x{:08x}", addr));
+        std::ostringstream oss;
+        oss << "Page fault read at address 0x" << std::hex << std::setw(8) << std::setfill('0') << addr;
+        throw std::runtime_error(oss.str());
     }
     return m_term_buffer;
 }
@@ -164,7 +169,9 @@ uint32_t emu::emulator::read_mmio(uint32_t addr) {
 void emu::emulator::write_mmio(uint32_t addr, uint32_t value) {
     if (addr != MMIO_TERM_OUT && addr != MMIO_TIMER_CFG) {
         term_exit();
-        throw std::runtime_error(std::format("Page fault write at address 0x{:08x}", addr));
+        std::ostringstream oss;
+        oss << "Page fault write at address 0x" << std::hex << std::setw(8) << std::setfill('0') << addr;
+        throw std::runtime_error(oss.str());
     }
     if (addr == MMIO_TERM_OUT) {
         write(STDOUT_FILENO, &value, 1);
@@ -175,7 +182,7 @@ void emu::emulator::write_mmio(uint32_t addr, uint32_t value) {
             throw std::runtime_error("Invalid timer value");
         }
         m_timer_tick = m_timer_lookup[value];
-        m_timer_start_semaphore.release();
+        m_timer_running = true;
     }
 } 
 
@@ -462,7 +469,7 @@ void emu::emulator::handle_interrupt() {
 }
 
 void emu::emulator::timer() {
-    m_timer_start_semaphore.acquire();
+    while (!m_timer_running) {}
     while (m_running) {
         std::this_thread::sleep_for(std::chrono::milliseconds(m_timer_tick));
         m_timer_mutex.lock();
@@ -475,7 +482,7 @@ void emu::emulator::dump_registers() {
     std::cout << "Emulated processor executed halt instruction\n";
     std::cout << "Emulated processor state:\n";
     for (size_t i = 0; i < m_reg_file.size(); ++i) {
-        std::cout << std::format("r{}={:#010x}", i, (uint32_t)(m_reg_file[i]));
+        std::cout << "r" << i << "=0x" << std::hex << std::setw(8) << std::setfill('0') << (uint32_t)(m_reg_file[i]) << std::dec;
         if ((i + 1) % 4 == 0) {
             std::cout << '\n';
         } 

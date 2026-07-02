@@ -58,7 +58,7 @@ namespace emu {
         std::array<int32_t, REG_NUM> m_reg_file;
         std::array<uint32_t, CONTROL_REG_NUM> m_control_reg_file;
         std::unordered_map<uint32_t, mem_block_t> m_memory;
-        std::atomic<bool> m_running = false;
+        bool m_running = false;
 
         std::thread m_timer_thread;
         std::thread m_terminal_thread;
@@ -74,7 +74,8 @@ namespace emu {
 
         std::mutex m_timer_mutex;
         std::mutex m_term_mutex;
-        std::binary_semaphore m_timer_start_semaphore = std::binary_semaphore(0);
+
+        bool m_timer_running = false;
 
         void load_memory(const std::string& path);
         void setup();

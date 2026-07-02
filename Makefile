@@ -1,5 +1,5 @@
 CXX      = g++
-CXXFLAGS = -std=c++20 -Wall -Wextra -g
+CXXFLAGS = -std=c++17 -Wall -Wextra -g
 LEX      = flex
 BISON    = bison
 
@@ -23,6 +23,8 @@ AS_OBJS = $(patsubst $(SRC_DIR)/as%.cpp, $(BUILD_DIR)/as%.o, $(AS_SRCS)) \
 LD_OBJS = $(patsubst $(SRC_DIR)/ld%.cpp, $(BUILD_DIR)/ld%.o, $(LD_SRCS))
 
 EMU_OBJS = $(patsubst $(SRC_DIR)/emu%.cpp, $(BUILD_DIR)/emu%.o, $(EMU_SRCS))
+
+LD_FLAGS = -pthread
 
 ASSEMBLER = assembler
 LINKER = linker
@@ -51,10 +53,10 @@ $(ASSEMBLER): $(AS_OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 $(LINKER): $(LD_OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^
+	$(CXX) $(CXXFLAGS) -o $@ $^ 
 
 $(EMULATOR): $(EMU_OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LD_FLAGS)
 
 clean:
 	rm -rf $(BUILD_DIR) $(ASSEMBLER) $(LINKER) $(EMULATOR)

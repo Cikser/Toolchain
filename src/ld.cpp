@@ -171,10 +171,11 @@ void ld::linker::merge_sections_and_symbols(std::vector<section_t>& sections, st
     for (auto& sym : symbols) {
         if (!sym.global) {
             auto it = m_sym_table.find(sym.name);
-            if (it != m_sym_table.end() && section_set.contains(sym.name)) {
+            auto cont = section_set.find(sym.name);
+            if (it != m_sym_table.end() && cont != section_set.end()) {
                 continue;
             }
-            else if (it == m_sym_table.end() && section_set.contains(sym.name)) {
+            else if (it == m_sym_table.end() && cont != section_set.end()) {
                 sym.section_idx = find_section(sym.name);
                 m_sym_table.insert({sym.name, sym});
                 continue;
@@ -287,7 +288,8 @@ void ld::linker::map_sections(std::vector<place_t>& place_requests) {
         unplaced_offset = placed_intervals.rbegin()->end;
     }
     for (auto& section : m_section_table) {
-        if (place_map.contains(section.name)) {
+        auto cont = place_map.find(section.name);
+        if (cont != place_map.end()) {
             continue;
         }
         section.address  = unplaced_offset;

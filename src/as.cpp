@@ -357,7 +357,13 @@ as::node_eval_t as::assembler::eval_node(const std::shared_ptr<expr_node_t>& nod
             break;
         }
     }
-    std::erase_if(result.coeffs, [](const auto& kv) { return kv.second == 0; });
+    for (auto it = result.coeffs.begin(); it != result.coeffs.end(); ) {
+        if (it->second == 0) {
+            it = result.coeffs.erase(it);
+        } else {
+            ++it;
+        }
+    }
     return result;
 }
 
