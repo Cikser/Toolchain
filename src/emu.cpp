@@ -67,7 +67,6 @@ void emu::emulator::load_memory(const std::string& path) {
         term_exit();
         throw std::runtime_error("File " + path + " in wrong format");  
     }
-    // todo format checks
     if (elf_header.e_type != ET_EXEC) {
         term_exit();
         throw std::runtime_error("File " + path + " not relocatable");

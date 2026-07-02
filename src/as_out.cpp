@@ -24,7 +24,7 @@ void as::assembler::assemble(const std::string& input_path, const std::string& o
     resolve_symbols();
     resolve_backpatch();
     normalize_extern_sections();
-    write_elf(output_path + ".o");
+    write_elf(output_path);
     write_dump(output_path + ".txt");
 }
 

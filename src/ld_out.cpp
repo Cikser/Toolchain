@@ -13,7 +13,7 @@ void ld::linker::link(const std::vector<std::string>& input_paths, const std::st
     first_pass(input_paths, place_requests);
     second_pass();
     write_dump(output_path + ".txt");
-    write_elf(output_path + (m_output_type == output_type::HEX ? ".hex" : ".o"));
+    write_elf(output_path);
 }
 
 void ld::linker::write_dump(const std::string& path) {

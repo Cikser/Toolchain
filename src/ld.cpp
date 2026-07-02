@@ -27,7 +27,6 @@ void ld::linker::extract_sections_and_symbols(const std::string& input_path,
         && elf_header.e_ident[EI_MAG2] == ELFMAG2 && elf_header.e_ident[EI_MAG3] == ELFMAG3)) {
         throw std::runtime_error("File " + input_path + " in wrong format");  
     }
-    // todo format checks
     if (elf_header.e_type != ET_REL) {
         throw std::runtime_error("File " + input_path + " not relocatable");
     }
