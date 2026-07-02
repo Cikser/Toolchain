@@ -2,6 +2,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <algorithm>
+#include <functional>
 
 as::assembler::assembler() {
     section_t section_undef{};
@@ -304,14 +305,19 @@ as::node_eval_t as::assembler::eval_node(const std::shared_ptr<expr_node_t>& nod
             result.value = sym.value;
             return result;
         }
-        if (sym.is_extern) {
-            result.coeffs[EXTERN_SECTION_PREFIX + sym.name] = 1;
-            result.value = 0;
+        if (sym.defined && sym.section.rfind(EXTERN_SECTION_PREFIX, 0) == 0) {
+            result.coeffs[sym.section] = 1;
+            result.value = sym.value;
             return result;
         }
         if (sym.defined) {
             result.coeffs[sym.section] = 1;
             result.value = sym.value;
+            return result;
+        }
+        if (sym.is_extern) {
+            result.coeffs[EXTERN_SECTION_PREFIX + sym.name] = 1;
+            result.value = 0;
             return result;
         }
         result.deferred = true;
@@ -393,36 +399,100 @@ void as::assembler::finalize_equ_symbol(const std::string& symbol_name, const ex
     sym.name = symbol_name;
     sym.defined = true;
     sym.value = result.value;
+    bool chains_to_extern = result.section.rfind(EXTERN_SECTION_PREFIX, 0) == 0;
     if (result.section == SECTION_ABS) {
         sym.absolute = true;
         sym.section = SECTION_ABS;
+        sym.is_extern = false;
+    }
+    else if (chains_to_extern) {
+        sym.absolute = false;
+        sym.section = result.section;
+        sym.is_extern = true;
+        sym.global = true;
     }
     else {
         sym.absolute = false;
         sym.section = result.section;
+        sym.is_extern = false;
     }
 }
 
+void as::assembler::collect_symbol_refs(const std::shared_ptr<expr_node_t>& node,
+                                         std::vector<std::string>& out) {
+    if (!node) {
+        return;
+    }
+    if (!node->is_binary) {
+        if (!node->is_literal) {
+            out.push_back(node->symbol);
+        }
+        return;
+    }
+    collect_symbol_refs(node->left, out);
+    collect_symbol_refs(node->right, out);
+}
+
 void as::assembler::resolve_pequs() {
-    bool change = true;
-    while (change) {
-        change = false;
-        for (auto iterator = m_pequ_table.begin(); iterator != m_pequ_table.end(); ++iterator) {
-            pending_equ_t& pequ = *iterator;
-            expr_result_t result = try_eval_expression(pequ.expr);
-            if (result.status == eval_status::INVALID) {
-                throw std::runtime_error("Invalid relocation combination in .equ expression for symbol " + pequ.symbol);
-            }
-            if (result.status == eval_status::DEFERRED) {
+    std::unordered_map<std::string, uint32_t> pequ_index;
+    for (uint32_t i = 0; i < m_pequ_table.size(); i++) {
+        pequ_index[m_pequ_table[i].symbol] = i;
+    }
+    std::function<void(uint32_t)> resolve_one = [&](uint32_t idx) {
+        pending_equ_t& pequ = m_pequ_table[idx];
+        if (pequ.state == equ_state::RESOLVED) { 
+            return;
+        }
+        if (pequ.state == equ_state::VISITING) {
+            throw std::runtime_error("Circular .equ dependency detected involving symbol " + pequ.symbol);
+        }
+        pequ.state = equ_state::VISITING;
+        std::vector<std::string> deps;
+        collect_symbol_refs(pequ.expr, deps);
+        for (auto& dep : deps) {
+            auto pit = pequ_index.find(dep);
+            if (pit != pequ_index.end()) {
+                resolve_one(pit->second);
                 continue;
             }
-            finalize_equ_symbol(pequ.symbol, result);
-            change = true;
-            m_pequ_table.erase(iterator);
-            break;
+            auto sit = m_sym_table.find(dep);
+            if (sit == m_sym_table.end()) {
+                symbol_t sym{};
+                sym.name = dep;
+                sym.section = SECTION_UNDEF;
+                sym.is_extern = true;
+                sym.global = true;
+                m_sym_table.insert({dep, sym});
+            }
+            else if (!sit->second.defined && !sit->second.is_extern) {
+                sit->second.is_extern = true;
+                sit->second.global = true;
+            }
         }
+        expr_result_t result = try_eval_expression(pequ.expr);
+        if (result.status == eval_status::INVALID) {
+            throw std::runtime_error("Invalid relocation combination in .equ expression for symbol " + pequ.symbol);
+        }
+        if (result.status == eval_status::DEFERRED) {
+            throw std::runtime_error("Unable to resolve .equ symbol " + pequ.symbol + ": unresolved dependency");
+        }
+        finalize_equ_symbol(pequ.symbol, result);
+        pequ.state = equ_state::RESOLVED;
+    };
+    for (uint32_t i = 0; i < m_pequ_table.size(); i++) {
+        resolve_one(i);
     }
-    if (!m_pequ_table.empty()) {
-        throw std::runtime_error("Unable to complete .equ evaluation: unresolved forward references");
+    m_pequ_table.clear();
+}
+
+void as::assembler::normalize_extern_sections() {
+    for (auto& [name, sym] : m_sym_table) {
+        if (sym.section.rfind(EXTERN_SECTION_PREFIX, 0) == 0) {
+            sym.section = SECTION_UNDEF;
+            sym.is_extern = true;
+            sym.global = true;
+            sym.defined = false;
+            sym.absolute = false;
+        }
     }
 }

@@ -11,24 +11,28 @@ extern int yyparse(as::assembler*);
 
 void as::assembler::assemble(const std::string& input_path, const std::string& output_path) {
     FILE* f = fopen(input_path.c_str(), "r");
-    if (!f)
+    if (!f) {
         throw std::runtime_error("Cannot open input file: " + input_path);
+    }
     yyin = f;
     int result = yyparse(this);
     fclose(f);
-    if (result != 0)
+    if (result != 0) {
         throw std::runtime_error("Parse error in file: " + input_path);
-    resolve_symbols();
+    }
     resolve_pequs();
+    resolve_symbols();
     resolve_backpatch();
+    normalize_extern_sections();
     write_elf(output_path + ".o");
     write_dump(output_path + ".txt");
 }
 
 void as::assembler::write_dump(const std::string& path) {
     std::ofstream out(path);
-    if (!out.is_open())
+    if (!out.is_open()) {
         throw std::runtime_error("Cannot open dump file: " + path);
+    }
     out << "=== SECTIONS ===\n";
     std::vector<section_t> sections;
     sections.reserve(m_section_table.size());

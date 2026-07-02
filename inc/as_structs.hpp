@@ -18,7 +18,7 @@ namespace as {
     #define SECTION_ABS_IDX ((uint32_t)-1)
 
     #define EXTERN_SECTION_PREFIX "@extern:"
-    #define PREFIX_LEN 9
+    #define PREFIX_LEN 8
 
     enum class relocation_type { R_PC_REL, R_32 };
 
@@ -123,9 +123,16 @@ namespace as {
         std::unordered_map<std::string, int32_t> coeffs;
     };
 
+    enum class equ_state {
+        UNVISITED,
+        VISITING,
+        RESOLVED
+    };
+
     struct pending_equ_t {
         std::string symbol;
         std::shared_ptr<expr_node_t> expr;
+        equ_state state = equ_state::UNVISITED;
     };
 }
 
